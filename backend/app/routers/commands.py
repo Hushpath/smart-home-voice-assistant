@@ -24,7 +24,7 @@ def parse_command(
     if not result.valid:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_response("INVALID_COMMAND", result.message, result.to_dict()),
+            detail=error_response(result.error_code, result.message, result.to_dict()),
         )
     return success_response(data=result.to_dict(), message="解析成功")
 

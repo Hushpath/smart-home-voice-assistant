@@ -16,19 +16,49 @@
         <span v-if="parsed.value !== null && parsed.value !== undefined">数值：{{ parsed.value }}</span>
         <span v-if="parsed.scene">场景：{{ parsed.scene }}</span>
         <span v-if="parsed.city">城市：{{ parsed.city }}</span>
+        <span v-if="parsed.confidence !== null && parsed.confidence !== undefined">
+          置信度：{{ parsed.confidenceLabel }} {{ parsed.confidencePercent }}%
+        </span>
+      </div>
+      <el-progress
+        v-if="parsed.confidencePercent !== null && parsed.confidencePercent !== undefined"
+        :percentage="parsed.confidencePercent"
+        :status="parsed.confidencePercent < 60 ? 'exception' : 'success'"
+      />
+      <p v-if="parsed.confidence !== null && parsed.confidence < 0.6" class="result-warning">
+        系统不太确定你的指令含义，请换一种说法，或使用文本输入。
+      </p>
+    </div>
+
+    <div v-if="result" class="result-section">
+      <label>执行结果</label>
+      <p>{{ summarizeCommandExecution(result) }}</p>
+    </div>
+
+    <div v-if="deviceBefore || deviceAfter" class="result-section">
+      <label>状态变化</label>
+      <div class="state-diff">
+        <span>执行前：{{ formatDeviceState(deviceBefore || {}) }}</span>
+        <span>执行后：{{ formatDeviceState(deviceAfter || {}) }}</span>
       </div>
     </div>
 
-    <div class="result-section">
-      <label>执行结果</label>
-      <pre>{{ formatJson(result || payload) }}</pre>
+    <el-collapse v-if="parsed || result" class="result-detail-collapse">
+      <el-collapse-item title="查看解析详情" name="detail">
+        <pre>{{ formatJson({ parsed, result }) }}</pre>
+      </el-collapse-item>
+    </el-collapse>
+
+    <div v-else class="result-section">
+      <label>返回内容</label>
+      <pre>{{ formatJson(payload) }}</pre>
     </div>
   </article>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { formatJson, summarizeCommandExecution } from '../utils/normalizers'
+import { formatDeviceState, formatJson, normalizeParsedCommand, summarizeCommandExecution } from '../utils/normalizers'
 
 const props = defineProps({
   payload: {
@@ -41,8 +71,13 @@ const props = defineProps({
   }
 })
 
-const parsed = computed(() => props.payload?.parsed || props.payload?.data?.parsed || null)
+const parsed = computed(() => {
+  const raw = props.payload?.parsed || props.payload?.data?.parsed || null
+  return raw ? normalizeParsedCommand(raw) : null
+})
 const result = computed(() => props.payload?.result || props.payload?.data?.result || null)
+const deviceBefore = computed(() => props.payload?.deviceBefore || props.payload?.device_before || result.value?.before_state || null)
+const deviceAfter = computed(() => props.payload?.deviceAfter || props.payload?.device_after || result.value?.after_state || null)
 const message = computed(() => props.payload?.message || '')
 const title = computed(() => {
   if (!props.success) return props.payload?.message || '后端返回错误'

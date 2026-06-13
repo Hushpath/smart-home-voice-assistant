@@ -49,10 +49,12 @@ def test_execute_turn_off_bedroom_air_conditioner(client, auth_headers, testing_
 
 
 def test_execute_set_temperature(client, auth_headers, testing_session_factory):
-    response = execute_command(client, auth_headers, "把卧室空调调到26度")
+    response = execute_command(client, auth_headers, "把卧室空调调到二十六度")
 
     assert response.status_code == 200
-    assert response.json()["data"]["result"]["after_state"]["properties"]["temperature"] == 26
+    data = response.json()["data"]
+    assert data["result"]["after_state"]["properties"]["temperature"] == 26
+    assert data["device_after"]["properties"]["temperature"] == 26
 
     db = testing_session_factory()
     try:
@@ -143,6 +145,8 @@ def test_command_logs_api(client, auth_headers):
     logs = response.json()["data"]
     assert logs[0]["raw_command"] == "打开客厅灯"
     assert logs[0]["success"] is True
+    assert logs[0]["parsed_result"]["confidence"] >= 0.6
+    assert "intent_scores" in logs[0]["parsed_result"]["parse_detail"]
 
 
 def test_device_history_after_command(client, auth_headers):
@@ -176,6 +180,46 @@ def test_execute_missing_device(client, auth_headers):
 
     assert response.status_code == 404
     assert response.json()["code"] == "DEVICE_NOT_FOUND"
+
+
+def test_execute_fuzzy_light_typo(client, auth_headers, testing_session_factory):
+    response = execute_command(client, auth_headers, "打开客厅等")
+
+    assert response.status_code == 200
+    parsed = response.json()["data"]["parsed"]
+    assert parsed["device_type"] == "light"
+    assert parsed["match_type"] == "fuzzy"
+
+    db = testing_session_factory()
+    try:
+        device = get_device_by_room_and_type(db, "客厅", "light")
+        assert device.is_on is True
+    finally:
+        db.close()
+
+
+def test_execute_air_conditioner_alias(client, auth_headers):
+    response = execute_command(client, auth_headers, "卧室冷气调到二十六度")
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["parsed"]["device_type"] == "air_conditioner"
+    assert data["result"]["after_state"]["properties"]["temperature"] == 26
+
+
+def test_execute_low_confidence_command(client, auth_headers, testing_session_factory):
+    response = execute_command(client, auth_headers, "帮我处理一下")
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "INVALID_COMMAND"
+
+    db = testing_session_factory()
+    try:
+        log = db.query(CommandLog).one()
+        assert log.success is False
+        assert log.parsed_result["confidence"] < 0.6
+    finally:
+        db.close()
 
 
 def test_execute_unsupported_action(client, auth_headers):

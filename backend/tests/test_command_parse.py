@@ -11,6 +11,10 @@ def assert_parse(response, expected):
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["valid"] is True
+    assert "confidence" in data
+    assert data["confidence"] >= 0.6
+    assert "normalized_text" in data
+    assert "parse_detail" in data
     for key, value in expected.items():
         assert data[key] == value
 
@@ -132,6 +136,59 @@ def test_parse_invalid_command(client, auth_headers):
     body = response.json()
     assert body["success"] is False
     assert body["code"] == "INVALID_COMMAND"
+    assert body["data"]["valid"] is False
+    assert body["data"]["confidence"] < 0.6
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        ("开一下客厅电灯", {"intent": "turn_on", "room": "客厅", "device_type": "light"}),
+        ("帮我打开客厅灯", {"intent": "turn_on", "room": "客厅", "device_type": "light"}),
+        ("客厅灯开一下", {"intent": "turn_on", "room": "客厅", "device_type": "light"}),
+        ("帮我把卧室空调调到二十六度", {"intent": "set_temperature", "room": "卧室", "device_type": "air_conditioner", "value": 26}),
+        ("将客厅灯亮度调到八十", {"intent": "set_brightness", "room": "客厅", "device_type": "light", "value": 80}),
+        ("把电视机音量调到三十", {"intent": "set_volume", "room": None, "device_type": "tv", "value": 30}),
+        ("麻烦提醒我晚上八点吃药", {"intent": "create_reminder", "reminder_time": "20:00", "reminder_content": "吃药"}),
+    ],
+)
+def test_parse_colloquial_variants(client, auth_headers, command, expected):
+    response = parse_command(client, auth_headers, command)
+
+    assert_parse(response, expected)
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        ("打开客厅等", {"intent": "turn_on", "room": "客厅", "device_type": "light"}),
+        ("卧室冷气调到二十六度", {"intent": "set_temperature", "room": "卧室", "device_type": "air_conditioner", "value": 26}),
+        ("把电视机声音调到30", {"intent": "set_volume", "room": None, "device_type": "tv", "value": 30}),
+    ],
+)
+def test_parse_fuzzy_and_alias_variants(client, auth_headers, command, expected):
+    response = parse_command(client, auth_headers, command)
+
+    assert_parse(response, expected)
+    data = response.json()["data"]
+    assert data["match_type"] in {"alias", "fuzzy", "exact"}
+
+
+@pytest.mark.parametrize(
+    ("command", "message"),
+    [
+        ("把卧室空调调到80度", "温度必须在 16-30 范围内"),
+        ("将客厅灯亮度调到120", "亮度必须在 0-100 范围内"),
+        ("把电视音量调到150", "音量必须在 0-100 范围内"),
+    ],
+)
+def test_parse_value_out_of_range(client, auth_headers, command, message):
+    response = parse_command(client, auth_headers, command)
+
+    assert response.status_code == 400
+    body = response.json()
+    assert body["code"] == "VALUE_OUT_OF_RANGE"
+    assert body["message"] == message
     assert body["data"]["valid"] is False
 
 

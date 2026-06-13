@@ -40,6 +40,14 @@
             <el-tag effect="plain" round>{{ row.intent || '-' }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="置信度" width="130">
+          <template #default="{ row }">
+            <span v-if="row.confidence !== null && row.confidence !== undefined">
+              {{ row.confidenceLabel }} {{ Math.round(row.confidence * 100) }}%
+            </span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="执行摘要" min-width="220">
           <template #default="{ row }">{{ summarizeCommandExecution(row.executionResult) }}</template>
         </el-table-column>
@@ -54,6 +62,11 @@
         <el-table-column label="时间" width="180">
           <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
         </el-table-column>
+        <el-table-column label="操作" width="110" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="openDetail(row)">详情</el-button>
+          </template>
+        </el-table-column>
       </el-table>
       <div class="table-pagination">
         <span>共 {{ filteredLogs.length }} 条记录</span>
@@ -65,6 +78,49 @@
         />
       </div>
     </section>
+
+    <el-dialog v-model="detailVisible" title="解析详情" width="760px" destroy-on-close>
+      <div v-if="selectedLog" class="log-detail-dialog">
+        <div class="result-tags">
+          <span>原始文本：{{ selectedLog.parsedResult.originalText || selectedLog.rawCommand || '-' }}</span>
+          <span>标准化：{{ selectedLog.parsedResult.normalizedText || '-' }}</span>
+          <span>意图：{{ selectedLog.intent || '-' }}</span>
+          <span>置信度：{{ selectedLog.confidenceLabel }} {{ selectedLog.confidence !== null ? Math.round(selectedLog.confidence * 100) + '%' : '' }}</span>
+          <span>匹配方式：{{ selectedLog.parsedResult.matchType || '-' }}</span>
+        </div>
+        <div class="log-detail-grid">
+          <div>
+            <label>意图打分</label>
+            <pre>{{ formatJson(selectedLog.parsedResult.parseDetail?.intent_scores) }}</pre>
+          </div>
+          <div>
+            <label>关键词</label>
+            <pre>{{ formatJson(selectedLog.parsedResult.matchedKeywords) }}</pre>
+          </div>
+          <div>
+            <label>房间匹配</label>
+            <pre>{{ formatJson(selectedLog.parsedResult.parseDetail?.room_match) }}</pre>
+          </div>
+          <div>
+            <label>设备匹配</label>
+            <pre>{{ formatJson(selectedLog.parsedResult.parseDetail?.device_match) }}</pre>
+          </div>
+          <div>
+            <label>参数抽取</label>
+            <pre>{{ formatJson(selectedLog.parsedResult.parseDetail?.value_extract) }}</pre>
+          </div>
+          <div>
+            <label>执行结果</label>
+            <pre>{{ formatJson(selectedLog.executionResult) }}</pre>
+          </div>
+        </div>
+        <el-collapse>
+          <el-collapse-item title="Raw JSON" name="raw">
+            <pre>{{ formatJson(selectedLog) }}</pre>
+          </el-collapse-item>
+        </el-collapse>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -78,6 +134,8 @@ const logs = ref([])
 const keyword = ref('')
 const statusFilter = ref('all')
 const currentPage = ref(1)
+const detailVisible = ref(false)
+const selectedLog = ref(null)
 const pageSize = 8
 
 const filteredLogs = computed(() => {
@@ -135,6 +193,11 @@ function exportLogs() {
   link.download = `command-logs-${Date.now()}.csv`
   link.click()
   URL.revokeObjectURL(url)
+}
+
+function openDetail(log) {
+  selectedLog.value = log
+  detailVisible.value = true
 }
 
 watch([keyword, statusFilter], () => {

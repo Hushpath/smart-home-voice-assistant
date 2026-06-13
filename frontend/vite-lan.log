@@ -10,3 +10,8 @@
   [32m➜[39m  [1mNetwork[22m: [36mhttp://172.26.83.134:[1m5173[22m/[39m
   [32m➜[39m  [1mNetwork[22m: [36mhttp://172.17.16.1:[1m5173[22m/[39m
 [2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
+[2m00:38:14[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/DashboardView.vue, /src/views/DevicesView.vue, /src/views/ScenesView.vue, /src/views/LogsView.vue, /src/views/VoiceControlView.vue, /src/views/RemindersView.vue, /src/components/CommandResult.vue[22m
+[2m00:38:34[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/CommandResult.vue[22m
+[2m00:39:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/VoiceControlView.vue[22m
+[2m00:40:02[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/LogsView.vue[22m
+[2m00:40:19[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/main.css[22m

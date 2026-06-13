@@ -40,9 +40,13 @@
 
 1. 前端通过 Web Speech API 将语音转换成中文文本。
 2. 后端 `POST /api/commands/parse` 接收中文文本。
-3. `CommandParser` 对文本做去空格和标点归一化。
-4. 按优先级匹配提醒、天气、场景、状态查询、温度、亮度、音量、开关设备等规则。
-5. 解析成功返回 `intent`、`room`、`device_type`、`value`、`scene`、`reminder_time`、`reminder_content`、`city` 等结构化字段。
+3. `CommandParser` 对文本做标准化：去空格、去标点、全角半角统一、口语词弱化。
+4. 对动作词、设备词和参数词做同义词归一，例如“开一下”归一为“打开”，“冷气”归一为“空调”，“声音”归一为“音量”。
+5. 将中文数字转换为阿拉伯数字，并抽取温度、亮度、音量和提醒时间。
+6. 基于动作词、设备词、房间词、数值词、单位词和场景/天气/提醒关键词计算各 intent 分数。
+7. 房间和设备先做精确匹配，再做别名匹配，最后用 `difflib.SequenceMatcher` 做轻量模糊匹配。
+8. 解析成功返回 `intent`、`room`、`device_type`、`value`、`scene`、`reminder_time`、`reminder_content`、`city`、`confidence`、`matched_keywords`、`match_type` 和 `parse_detail` 等结构化字段。
+9. 低置信度指令返回明确提示，不执行设备控制。
 6. 解析失败返回统一错误码 `INVALID_COMMAND`。
 
 ## 指令执行流程
@@ -64,6 +68,8 @@
 - 查询房间、设备和 dashboard 返回初始化数据。
 - 修改设备状态后数据库持久化，且写入设备状态历史。
 - 中文指令解析覆盖开关、温度、亮度、音量、状态查询、场景、提醒和天气。
+- 口语化表达、中文数字参数、设备别名和少量识别误差可被解析。
+- 解析结果包含 `confidence`、`intent_scores`、关键词匹配和参数抽取详情。
 - 中文指令执行后写入 `command_logs`。
 - 设备控制指令写入 `device_status_history`。
 - 温度、亮度、音量越界返回 `VALUE_OUT_OF_RANGE`。

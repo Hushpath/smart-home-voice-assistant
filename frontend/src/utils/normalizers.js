@@ -48,12 +48,14 @@ export function normalizeDashboard(dashboard = {}) {
 }
 
 export function normalizeCommandLog(log = {}) {
-  const parsedResult = log.parsed_result || {}
+  const parsedResult = normalizeParsedCommand(log.parsed_result || {})
   return {
     id: log.id,
     userId: log.user_id,
     rawCommand: log.raw_command || '-',
     intent: parsedResult.intent || '-',
+    confidence: parsedResult.confidence,
+    confidenceLabel: parsedResult.confidenceLabel,
     parsedResult,
     executionResult: log.execution_result || null,
     success: Boolean(log.success),
@@ -97,9 +99,40 @@ export function normalizeCommandResult(result = {}) {
     success: result.success,
     code: result.code,
     message: result.message,
-    parsed: data.parsed || null,
-    result: data.result || null
+    parsed: data.parsed ? normalizeParsedCommand(data.parsed) : null,
+    result: data.result || null,
+    deviceBefore: data.device_before || data.result?.before_state || null,
+    deviceAfter: data.device_after || data.result?.after_state || null,
+    affectedDevices: data.affected_devices || [],
+    reminder: data.reminder || data.result?.reminder || null,
+    weather: data.weather || data.result?.weather || null,
+    scene: data.scene || data.result?.scene || null
   }
+}
+
+export function normalizeParsedCommand(parsed = {}) {
+  const confidence = typeof parsed.confidence === 'number' ? parsed.confidence : null
+  return {
+    ...parsed,
+    originalText: parsed.original_text || '',
+    normalizedText: parsed.normalized_text || '',
+    deviceType: parsed.device_type || null,
+    reminderTime: parsed.reminder_time || null,
+    reminderContent: parsed.reminder_content || null,
+    confidence,
+    confidencePercent: confidence === null ? null : Math.round(confidence * 100),
+    confidenceLabel: getConfidenceLabel(confidence),
+    matchedKeywords: parsed.matched_keywords || [],
+    matchType: parsed.match_type || null,
+    parseDetail: parsed.parse_detail || {}
+  }
+}
+
+export function getConfidenceLabel(confidence) {
+  if (confidence === null || confidence === undefined) return '-'
+  if (confidence >= 0.8) return '高'
+  if (confidence >= 0.6) return '中'
+  return '低'
 }
 
 export function normalizeWeather(weather = {}) {

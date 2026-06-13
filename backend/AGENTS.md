@@ -1,297 +1,161 @@
 # AGENTS.md
 
-## 项目背景
+## 适用范围
+
+本文件适用于 `backend/` 目录。当前后端已经完成主要功能开发，后续工作应以维护、修复、测试补全和文档同步为主，不再按阶段开发提示执行。
+
+## 项目定位
 
 本项目是《软件工程》课程大作业“智能家居语音交互助手系统”的后端部分。
 
-系统采用 Web 原型方式实现。前端使用 Vue 3 和浏览器 Web Speech API 完成真实语音输入，并将识别后的中文文本指令发送给后端。后端使用 FastAPI 接收文本指令，完成用户认证、中文指令解析、虚拟设备控制、设备状态持久化、操作日志、提醒、天气查询和场景联动。
+后端使用 FastAPI 接收前端识别后的中文文本指令，负责：
 
-本项目不接入真实智能家居硬件，使用数据库中的虚拟设备模拟真实家居设备。天气查询优先使用真实天气 API，失败时自动回退到本地模拟数据；测试和演示必须保证在无网络环境下仍可运行。
+- 用户认证和 JWT 鉴权；
+- 房间、设备和 dashboard 数据接口；
+- 设备状态持久化和设备状态历史；
+- 中文指令解析与执行；
+- 指令执行日志；
+- 提醒事项 CRUD；
+- 场景查询和场景执行；
+- 天气查询，优先使用 Open-Meteo，失败时回退本地备用数据。
+
+系统使用数据库中的虚拟设备模拟智能家居设备，不接入真实硬件。
 
 ## 技术栈
 
-后端固定使用：
+- Python 3.10+
+- FastAPI
+- SQLite
+- SQLAlchemy
+- Pydantic
+- JWT
+- pytest
+- Uvicorn
+- httpx
 
-* Python 3.10+
-* FastAPI
-* SQLite
-* SQLAlchemy
-* Pydantic
-* JWT
-* pytest
-* Uvicorn
+不要引入 Spring Boot、Django、MySQL、Redis、Docker、Celery、APScheduler、外部大模型 API 或真实智能家居硬件接入，除非用户明确要求并说明原因。
 
-不要使用：
+## 事实来源
 
-* Spring Boot
-* Django
-* MySQL
-* Redis
-* Docker
-* 外部大模型 API
-* 真实智能家居硬件
-* 前端框架代码
+修改后端前，应优先查看：
 
-除非后续明确要求，否则不要引入上述技术或服务。
+1. `backend/README.md`
+2. `backend/app/routers/`
+3. `backend/app/schemas/`
+4. `backend/app/models/`
+5. `backend/app/services/`
+6. Swagger 文档 `/docs`
 
-## 核心约束
+如果文档与代码不一致，以当前代码和测试为准，并同步修正文档。
 
-1. 后端必须是可运行的 FastAPI 项目，不能只写伪代码。
-2. 设备状态必须持久化到 SQLite，不能只存储在内存中。
-3. 真实语音识别由前端完成，后端只接收识别后的中文文本指令。
-4. 天气查询优先使用真实天气 API，失败时自动回退到本地模拟数据；测试和演示必须保证在无网络环境下仍可运行。
-5. 所有核心接口必须出现在 Swagger 文档中。
-6. 所有接口尽量统一返回 `success/code/message/data`。
-7. 每次指令执行必须写入 `command_logs`。
-8. 每次设备状态变化必须写入 `device_status_history`。
-9. 密码必须哈希存储，不能明文存储。
-10. 代码要模块化，便于写需求分析、软件设计、测试报告和项目管理文档。
-11. 每个阶段完成后必须说明如何运行、如何测试、修改了哪些文件、是否有未完成项。
+## 维护原则
+
+- 保持现有接口路径稳定，不随意改动 `/api/...` 路由。
+- 保持统一响应格式：`success/code/message/data`。
+- 保持现有数据库模型稳定，不随意重建表结构。
+- 保持默认账号、初始化数据和课程演示流程可用。
+- 修改设备状态时必须持久化到 SQLite。
+- 设备状态变化必须写入 `device_status_history`。
+- 指令执行成功或失败都必须写入 `command_logs`。
+- 密码必须哈希存储，不能明文存储。
+- 提醒模块只做 CRUD，不实现后台定时推送、系统通知、消息队列或长期后台任务。
+- 天气请求必须有超时和本地兜底，测试不能依赖真实外网。
+
+## 鲁棒语音指令解析维护约定
+
+中文指令解析是本项目的核心能力，主要位于 `app/services/command_parser.py`、`app/services/command_executor.py` 和 `app/routers/commands.py`。维护时应保留以下设计：
+
+- 后端只接收前端识别后的中文文本，不接收音频文件，不训练语音识别模型。
+- 不接入外部 ASR 服务、外部大模型 API 或大型 NLP 依赖。
+- `/api/commands/parse` 和 `/api/commands/execute` 路径、请求体字段 `{ "command": "..." }` 和统一响应格式必须保持稳定。
+- 解析结果应继续包含 `original_text`、`normalized_text`、`intent`、`room`、`device_type`、`value`、`confidence`、`matched_keywords`、`match_type`、`parse_detail`、`valid` 和 `message` 等字段。
+- `parse_detail` 应承载可解释算法过程，包括 `intent_scores`、`room_match`、`device_match`、`value_extract`、`time_extract` 或等价信息。
+- 文本标准化应继续支持口语词弱化、同义词归一、中文数字转换和常见标点处理。
+- 意图识别应保持可解释打分机制，不要退回到不可解释的大段 if-else。
+- 房间和设备匹配应优先精确匹配，其次别名匹配，最后使用轻量字符串相似度模糊匹配。
+- 温度范围保持 `16-30`，亮度和音量范围保持 `0-100`；越界返回 `VALUE_OUT_OF_RANGE`，不得执行设备状态修改。
+- 低置信度设备控制类指令不得强行执行，应返回明确提示。
+- 指令执行成功或失败都必须将增强后的解析信息写入 `command_logs.parsed_result`。
+- 设备状态变化仍必须写入 `device_status_history`。
+- 修改解析规则后，应优先补充或更新 `tests/test_command_parse.py` 和 `tests/test_command_execute.py`。
+
+建议保留的演示/测试指令：
+
+- `打开客厅灯`
+- `开一下客厅电灯`
+- `帮我打开客厅灯`
+- `客厅灯开一下`
+- `把卧室空调调到二十六度`
+- `将客厅灯亮度调到八十`
+- `把电视机音量调到三十`
+- `打开客厅等`
+- `卧室冷气调到二十六度`
+- `开启睡眠模式`
+- `提醒我晚上八点吃药`
+- `查询今天的天气`
 
 ## 鉴权规则
 
-除以下接口外，其余业务接口默认需要 JWT 鉴权：
+除以下接口外，其余业务接口默认需要 JWT：
 
-* `GET /api/health`
-* `POST /api/auth/register`
-* `POST /api/auth/login`
-* `GET /api/weather`
+- `GET /api/health`
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/weather`
 
-如果测试或前端对接需要临时放开接口，必须在 README 中明确说明原因。
+如果因前端联调需要调整鉴权，必须保持最小修改，并在 README 中说明原因。
 
-## 推荐目录结构
+## 常用命令
 
-请尽量采用如下后端目录结构：
+安装依赖：
 
-```text
-backend/
-├── app/
-│   ├── main.py
-│   ├── core/
-│   │   ├── config.py
-│   │   └── security.py
-│   ├── db/
-│   │   ├── session.py
-│   │   └── init_db.py
-│   ├── models/
-│   ├── schemas/
-│   ├── routers/
-│   ├── services/
-│   └── utils/
-├── tests/
-├── data/
-├── requirements.txt
-├── README.md
-├── run.py
-└── AGENTS.md
+```bash
+cd backend
+pip install -r requirements.txt
 ```
 
-## 必须实现的核心接口
+初始化数据库：
 
-统一使用 `/api` 前缀。
-
-健康检查：
-
-* `GET /api/health`
-
-用户认证：
-
-* `POST /api/auth/register`
-* `POST /api/auth/login`
-* `GET /api/auth/me`
-
-房间与设备：
-
-* `GET /api/rooms`
-* `GET /api/devices`
-* `GET /api/devices/{device_id}`
-* `PATCH /api/devices/{device_id}/state`
-* `GET /api/devices/{device_id}/history`
-* `GET /api/dashboard`
-
-中文指令：
-
-* `POST /api/commands/parse`
-* `POST /api/commands/execute`
-* `GET /api/commands/logs`
-
-提醒：
-
-* `GET /api/reminders`
-* `POST /api/reminders`
-* `PATCH /api/reminders/{reminder_id}`
-* `DELETE /api/reminders/{reminder_id}`
-
-场景：
-
-* `GET /api/scenes`
-* `POST /api/scenes/{scene_id}/run`
-
-天气：
-
-* `GET /api/weather?city=北京`
-
-如果天气接口未传入 `city`，默认返回本地备用天气数据。
-
-## 必须支持的中文指令
-
-至少支持以下中文指令及常见变体：
-
-* 打开客厅灯
-* 开一下客厅灯
-* 关闭卧室空调
-* 关掉卧室空调
-* 把卧室空调调到26度
-* 空调设置为26度
-* 将客厅灯亮度调到80
-* 客厅灯调到80亮度
-* 把电视音量调到30
-* 查看客厅设备状态
-* 查询卧室设备状态
-* 开启睡眠模式
-* 开启回家模式
-* 开启离家模式
-* 提醒我晚上八点吃药
-* 提醒我20:00吃药
-* 查询今天的天气
-* 查询北京天气
-
-## 统一返回格式
-
-成功响应尽量使用：
-
-```json
-{
-  "success": true,
-  "code": "OK",
-  "message": "操作成功",
-  "data": {}
-}
+```bash
+cd backend
+python -m app.db.init_db
 ```
 
-失败响应尽量使用：
+启动后端：
 
-```json
-{
-  "success": false,
-  "code": "DEVICE_NOT_FOUND",
-  "message": "未找到指定设备",
-  "data": null
-}
+```bash
+cd backend
+python run.py
 ```
 
-常见错误码：
+或：
 
-* `OK`
-* `INVALID_COMMAND`
-* `ROOM_NOT_FOUND`
-* `DEVICE_NOT_FOUND`
-* `UNSUPPORTED_ACTION`
-* `VALUE_OUT_OF_RANGE`
-* `UNAUTHORIZED`
-* `DATABASE_ERROR`
+```bash
+cd backend
+uvicorn app.main:app --reload
+```
 
-## 数据初始化要求
+运行测试：
 
-数据库初始化数据至少包括：
+```bash
+cd backend
+python -m pytest
+```
 
-* 1 个默认家庭；
-* 4 个房间：客厅、卧室、厨房、书房；
-* 至少 10 个设备：
+## 修改后检查
 
-  * 客厅：灯、空调、电视、窗帘；
-  * 卧室：灯、空调、窗帘；
-  * 厨房：灯、排风扇；
-  * 书房：灯、空调；
-* 3 个场景：
+后端代码修改后，至少检查：
 
-  * 回家模式；
-  * 睡眠模式；
-  * 离家模式；
-* 1 个默认测试用户。
+- `python -m pytest` 是否通过；
+- `GET /api/health` 是否可用；
+- `/docs` 是否能打开；
+- README 中的接口、字段、启动命令是否仍准确；
+- 是否影响前端已对接字段。
 
-## 数据库表要求
+仅修改文档时不强制运行测试，但需要说明未运行测试的原因。
 
-至少建立以下数据表：
+## 与前端的协作约定
 
-1. `users`
-2. `homes`
-3. `rooms`
-4. `devices`
-5. `command_logs`
-6. `device_status_history`
-7. `reminders`
-8. `scenes`
-9. `scene_actions`
+前端位于 `frontend/`，默认通过 Vite `/api` 代理访问后端。后端是接口字段和业务规则的事实来源；如果后端字段发生变化，必须同步更新前端适配函数和相关 README。
 
-其中：
-
-* `devices` 表必须保存设备类型、所属房间、开关状态、在线状态和 JSON 属性字段；
-* `command_logs` 表必须记录原始指令、解析结果、执行结果、是否成功、错误信息、用户和时间；
-* `device_status_history` 表必须记录设备状态变化前后的内容。
-
-## 提醒模块限制
-
-提醒模块只需要支持提醒事项的创建、查询、修改和删除。
-
-不要实现真实后台定时推送、系统通知、消息队列、Celery、APScheduler 或长期后台任务。
-
-## 测试要求
-
-必须使用 pytest 编写测试，至少覆盖：
-
-* 用户注册；
-* 用户登录；
-* 获取当前用户；
-* 查询设备；
-* 修改设备状态；
-* 查询设备状态历史；
-* 中文指令解析；
-* 中文指令执行；
-* 提醒功能；
-* 场景执行；
-* 天气查询；
-* 异常指令处理。
-
-异常测试至少覆盖：
-
-* 空指令；
-* 不存在的房间；
-* 不存在的设备；
-* 设备不支持的操作；
-* 参数超出范围；
-* 未登录访问受保护接口。
-
-## README 要求
-
-`README.md` 至少包含：
-
-1. 项目简介；
-2. 技术栈；
-3. 目录结构；
-4. 安装依赖命令；
-5. 初始化数据库命令；
-6. 启动后端命令；
-7. 运行测试命令；
-8. 默认账号密码；
-9. 核心接口表；
-10. 语音指令示例；
-11. 前后端对接说明；
-12. 数据库表说明；
-13. 测试说明；
-14. 已知限制；
-15. 后续扩展方向。
-
-## 每次任务完成后的汇报要求
-
-每次完成开发任务后，请输出：
-
-1. 新增和修改的文件列表；
-2. 已实现功能；
-3. 安装依赖命令；
-4. 初始化数据库命令；
-5. 启动后端命令；
-6. 运行测试命令；
-7. 默认账号密码；
-8. 核心接口示例；
-9. 当前是否有未完成项或需要人工确认的地方。
+不要为了前端展示方便伪造后端数据或重写既有接口。确需修复 CORS、接口注册或明显 bug 时，应保持最小改动并说明影响范围。

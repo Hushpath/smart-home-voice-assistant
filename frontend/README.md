@@ -149,10 +149,10 @@ Authorization: Bearer <access_token>
 ## 当前页面
 
 - `/login`：登录页，已对接 `POST /api/auth/login`。
-- `/dashboard`：Dashboard 首页，已展示房间数量、设备总数、在线设备数、开启设备数、可切换城市天气、常用语音指令示例、最近指令日志和可执行快捷场景入口。
+- `/dashboard`：Dashboard 首页，已展示房间数量、设备总数、在线设备数、开启设备数、可切换城市天气、天气数据来源、最近指令日志和可执行快捷场景入口。
 - `/devices`：设备管理页，已展示房间筛选、按房间分组的设备卡片、在线/开关状态、关键属性、设备详情、手动开关、常见属性调节和设备历史抽屉。
 - `/voice`：语音控制页，已实现 Web Speech API 语音识别、文本兜底输入、`POST /api/commands/parse` 解析预览、`POST /api/commands/execute` 执行、后端 message 播报、设备状态刷新和最近日志刷新。
-- `/logs`：操作日志页，已对接 `GET /api/commands/logs` 并用表格展示指令文本、执行摘要、成功状态、错误信息和时间，支持本地筛选、分页和 CSV 导出。
+- `/logs`：操作日志页，已对接 `GET /api/commands/logs` 并用表格展示指令文本、意图、置信度、执行摘要、成功状态、错误信息和时间，支持查看解析详情、本地筛选、分页和 CSV 导出。
 - `/reminders`：提醒管理页，已对接提醒列表、新建、编辑、状态修改和删除。
 - `/scenes`：场景模式页，已展示场景卡片并支持执行场景。
 
@@ -189,9 +189,20 @@ Authorization: Bearer <access_token>
   "user_id": 1,
   "raw_command": "打开客厅灯",
   "parsed_result": {
+    "original_text": "打开客厅灯",
+    "normalized_text": "打开客厅灯",
     "intent": "turn_on",
     "room": "客厅",
-    "device_type": "light"
+    "device_type": "light",
+    "confidence": 0.95,
+    "matched_keywords": ["客厅", "灯"],
+    "match_type": "exact",
+    "parse_detail": {
+      "intent_scores": {},
+      "room_match": {},
+      "device_match": {},
+      "value_extract": {}
+    }
   },
   "execution_result": {},
   "success": true,
@@ -274,11 +285,16 @@ Authorization: Bearer <access_token>
 {
   "city": "北京",
   "weather": "晴",
-  "temperature": 26,
-  "humidity": 45,
-  "advice": "适合开窗通风"
+  "temperature": 28.4,
+  "humidity": 35,
+  "wind_speed": 8.2,
+  "advice": "天气较适宜，可根据室内状态通风或调节设备。",
+  "source": "open_meteo",
+  "updated_at": "2026-06-13T10:00"
 }
 ```
+
+`source=open_meteo` 表示来自 Open-Meteo；`source=mock` 表示真实天气失败、超时、无网络或城市无法识别时使用本地备用数据。Dashboard 当前内置城市选项包括北京、上海、广州、深圳、杭州、南京、成都、重庆、西安、武汉和本地。
 
 ## 已确认的设备字段
 
@@ -374,6 +390,32 @@ POST /api/commands/parse
 ```
 
 用于展示解析预览。
+
+语音控制页展示策略：
+
+- 主区域只展示解析摘要：原始指令、标准化文本、意图、房间、设备、参数、置信度和执行前后状态。
+- 完整算法细节默认折叠，通过“查看解析详情”展开。
+- 低置信度指令会提示换一种说法，或使用文本输入兜底。
+
+操作日志页展示策略：
+
+- 表格展示指令文本、意图、置信度、执行摘要和成功/失败状态。
+- 点击“详情”可查看完整解析过程，包括意图打分、关键词、房间匹配、设备匹配、参数抽取、执行结果和 raw JSON。
+
+鲁棒解析演示指令：
+
+- 打开客厅灯
+- 开一下客厅电灯
+- 帮我打开客厅灯
+- 客厅灯开一下
+- 把卧室空调调到二十六度
+- 将客厅灯亮度调到八十
+- 把电视机音量调到三十
+- 打开客厅等
+- 卧室冷气调到二十六度
+- 开启睡眠模式
+- 提醒我晚上八点吃药
+- 查询今天的天气
 
 ## 前后端联调说明
 

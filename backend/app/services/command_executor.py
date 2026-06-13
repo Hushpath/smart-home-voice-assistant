@@ -26,7 +26,7 @@ class CommandExecutor:
         parsed = self.parser.parse(command)
         if not parsed.valid:
             self._write_log(command, parsed, None, False, parsed.message)
-            raise BusinessError("INVALID_COMMAND", parsed.message, data=parsed.to_dict())
+            raise BusinessError(parsed.error_code, parsed.message, data=parsed.to_dict())
 
         try:
             result = self._execute_parsed(parsed)
@@ -36,7 +36,7 @@ class CommandExecutor:
 
         self._write_log(command, parsed, result, True, None)
         self.db.commit()
-        return {"parsed": parsed.to_dict(), "result": result}
+        return self._build_execute_response(parsed, result)
 
     def _execute_parsed(self, parsed: ParseResult) -> dict[str, Any]:
         if parsed.intent == "turn_on":
@@ -140,6 +140,23 @@ class CommandExecutor:
         hour, minute = [int(part) for part in value.split(":", 1)]
         now = datetime.now()
         return now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+
+    def _build_execute_response(self, parsed: ParseResult, result: dict[str, Any]) -> dict[str, Any]:
+        response: dict[str, Any] = {
+            "parsed": parsed.to_dict(),
+            "result": result,
+            "device_before": result.get("before_state"),
+            "device_after": result.get("after_state"),
+            "affected_devices": [],
+            "reminder": result.get("reminder"),
+            "weather": result.get("weather"),
+            "scene": result.get("scene"),
+        }
+        if result.get("device"):
+            response["affected_devices"] = [result["device"]]
+        if result.get("changes"):
+            response["affected_devices"] = [change.get("device") for change in result["changes"] if change.get("device")]
+        return response
 
     def _write_log(
         self,

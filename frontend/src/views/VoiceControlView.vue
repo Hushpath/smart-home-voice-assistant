@@ -4,7 +4,7 @@
       <div class="voice-copy">
         <p class="panel-kicker">Voice command console</p>
         <h2>让中文指令直接驱动虚拟家居。</h2>
-        <p>语音识别由浏览器完成，后端只接收识别后的中文文本并执行设备、场景、提醒或天气查询。</p>
+        <p>语音识别由浏览器完成，后端通过文本标准化、同义词归一、意图打分、设备模糊匹配和参数校验理解中文指令。</p>
       </div>
 
       <div class="voice-radar" :class="{ listening: executing }">
@@ -35,7 +35,16 @@
             <span v-if="parsePreview.reminder_time">时间：{{ parsePreview.reminder_time }}</span>
             <span v-if="parsePreview.reminder_content">提醒：{{ parsePreview.reminder_content }}</span>
             <span v-if="parsePreview.city">城市：{{ parsePreview.city }}</span>
+            <span v-if="parsePreview.confidence !== null && parsePreview.confidence !== undefined">
+              置信度：{{ parsePreview.confidenceLabel }} {{ parsePreview.confidencePercent }}%
+            </span>
           </div>
+          <p v-if="parsePreview.normalizedText">标准化文本：{{ parsePreview.normalizedText }}</p>
+          <el-progress
+            v-if="parsePreview.confidencePercent !== null && parsePreview.confidencePercent !== undefined"
+            :percentage="parsePreview.confidencePercent"
+            :status="parsePreview.confidencePercent < 60 ? 'exception' : 'success'"
+          />
         </article>
 
         <CommandResult v-if="lastResult" :payload="lastResult" />
@@ -51,6 +60,22 @@
     </section>
 
     <section class="voice-monitor-grid">
+      <article class="voice-monitor-card">
+        <div class="section-head">
+          <div>
+            <p class="panel-kicker">Execution chain</p>
+            <h3>执行链路</h3>
+          </div>
+        </div>
+        <div class="command-flow-list">
+          <span>语音输入</span>
+          <span>文本理解</span>
+          <span>设备控制</span>
+          <span>状态更新</span>
+          <span>日志记录</span>
+        </div>
+      </article>
+
       <article class="voice-monitor-card">
         <div class="section-head">
           <div>
@@ -99,6 +124,7 @@ import {
   normalizeCommandLog,
   normalizeCommandResult,
   normalizeDevice,
+  normalizeParsedCommand,
   summarizeCommandExecution
 } from '../utils/normalizers'
 
@@ -115,13 +141,18 @@ const recentLogs = ref([])
 
 const examples = [
   '打开客厅灯',
+  '开一下客厅电灯',
+  '帮我打开客厅灯',
+  '客厅灯开一下',
   '关闭卧室空调',
-  '把卧室空调调到26度',
-  '将客厅灯亮度调到80',
-  '把电视音量调到30',
+  '把卧室空调调到二十六度',
+  '将客厅灯亮度调到八十',
+  '把电视机音量调到三十',
+  '打开客厅等',
+  '卧室冷气调到二十六度',
   '开启睡眠模式',
   '提醒我晚上八点吃药',
-  '查询北京天气'
+  '查询今天的天气'
 ]
 
 function chooseExample(command) {
@@ -138,7 +169,7 @@ async function parseCommand() {
   parsing.value = true
   try {
     const response = await parseCommandApi(command, { rawEnvelope: true })
-    parsePreview.value = response.data
+    parsePreview.value = normalizeParsedCommand(response.data)
     ElMessage.success(response.message || '解析成功')
     return response.data
   } finally {
@@ -158,7 +189,7 @@ async function executeCommand() {
   try {
     const response = await executeCommandApi(command, { rawEnvelope: true })
     lastResult.value = normalizeCommandResult(response)
-    parsePreview.value = response.data?.parsed || parsePreview.value
+    parsePreview.value = response.data?.parsed ? normalizeParsedCommand(response.data.parsed) : parsePreview.value
     ElMessage.success(response.message || '指令执行成功')
     speak(response.message || '指令执行成功')
     await Promise.all([loadDevices(), loadLogs()])
