@@ -53,11 +53,12 @@
             </el-select>
           </div>
           <p>{{ weather.advice }}</p>
-          <small class="weather-source-note">本地模拟天气数据</small>
+          <small class="weather-source-note">{{ weather.sourceLabel }}</small>
         </div>
         <div class="weather-meter">
           <strong>{{ weather.temperature ?? '--' }}℃</strong>
           <span>湿度 {{ weather.humidity ?? '--' }}%</span>
+          <span>风速 {{ weather.windSpeed ?? '--' }} km/h</span>
         </div>
       </article>
 
@@ -156,7 +157,7 @@ const recentLogs = ref([])
 const devices = ref([])
 const selectedWeatherCity = ref('北京')
 const weatherLoading = ref(false)
-const weatherCityOptions = ['北京', '上海', '广州', '本地']
+const weatherCityOptions = ['北京', '上海', '广州', '深圳', '杭州', '南京', '成都', '重庆', '西安', '武汉', '本地']
 
 const stats = computed(() => [
   { label: '房间数量', value: dashboard.roomCount, note: '当前家庭空间' },

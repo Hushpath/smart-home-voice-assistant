@@ -103,12 +103,17 @@ export function normalizeCommandResult(result = {}) {
 }
 
 export function normalizeWeather(weather = {}) {
+  const source = weather.source || 'mock'
   return {
     city: weather.city || '本地',
     weather: weather.weather || '--',
     temperature: weather.temperature,
     humidity: weather.humidity,
-    advice: weather.advice || '暂无建议'
+    windSpeed: weather.wind_speed,
+    advice: weather.advice || '暂无建议',
+    source,
+    sourceLabel: source === 'open_meteo' ? 'Open-Meteo 实时天气' : '本地备用天气',
+    updatedAt: weather.updated_at || null
   }
 }
 

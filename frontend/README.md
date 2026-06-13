@@ -149,7 +149,7 @@ Authorization: Bearer <access_token>
 ## 当前页面
 
 - `/login`：登录页，已对接 `POST /api/auth/login`。
-- `/dashboard`：Dashboard 首页，已展示房间数量、设备总数、在线设备数、开启设备数、北京天气、常用语音指令示例、最近指令日志和可执行快捷场景入口。
+- `/dashboard`：Dashboard 首页，已展示房间数量、设备总数、在线设备数、开启设备数、可切换城市天气、常用语音指令示例、最近指令日志和可执行快捷场景入口。
 - `/devices`：设备管理页，已展示房间筛选、按房间分组的设备卡片、在线/开关状态、关键属性、设备详情、手动开关、常见属性调节和设备历史抽屉。
 - `/voice`：语音控制页，已实现 Web Speech API 语音识别、文本兜底输入、`POST /api/commands/parse` 解析预览、`POST /api/commands/execute` 执行、后端 message 播报、设备状态刷新和最近日志刷新。
 - `/logs`：操作日志页，已对接 `GET /api/commands/logs` 并用表格展示指令文本、执行摘要、成功状态、错误信息和时间，支持本地筛选、分页和 CSV 导出。

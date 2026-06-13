@@ -1,4 +1,5 @@
 from app.models import CommandLog, Device, DeviceStatusHistory, Reminder
+from app.services import home_actions
 
 
 def execute_command(client, auth_headers, command):
@@ -130,6 +131,7 @@ def test_execute_query_weather(client, auth_headers):
     weather = response.json()["data"]["result"]["weather"]
     assert weather["city"] == "北京"
     assert weather["weather"] == "晴"
+    assert weather["source"] == "mock"
 
 
 def test_command_logs_api(client, auth_headers):
@@ -219,6 +221,58 @@ def test_weather_api_without_login(client):
 
     assert response.status_code == 200
     assert response.json()["data"]["city"] == "北京"
+    assert response.json()["data"]["source"] == "mock"
+
+
+def test_weather_api_uses_open_meteo_when_available(client, monkeypatch):
+    def fake_weather(city_name):
+        return {
+            "city": city_name,
+            "weather": "多云",
+            "temperature": 22.5,
+            "humidity": 63,
+            "wind_speed": 5.4,
+            "advice": "天气较适宜，可根据室内状态通风或调节设备。",
+            "source": "open_meteo",
+            "updated_at": "2026-06-13T10:00",
+        }
+
+    monkeypatch.setattr(home_actions, "_fetch_open_meteo_weather", fake_weather)
+    home_actions.clear_weather_cache()
+
+    response = client.get("/api/weather?city=深圳")
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["city"] == "深圳"
+    assert data["source"] == "open_meteo"
+    assert data["wind_speed"] == 5.4
+    assert data["updated_at"] == "2026-06-13T10:00"
+
+
+def test_weather_api_falls_back_to_mock_when_open_meteo_fails(client, monkeypatch):
+    def failed_weather(city_name):
+        raise ValueError(f"weather unavailable: {city_name}")
+
+    monkeypatch.setattr(home_actions, "_fetch_open_meteo_weather", failed_weather)
+    home_actions.clear_weather_cache()
+
+    response = client.get("/api/weather?city=杭州")
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["city"] == "杭州"
+    assert data["source"] == "mock"
+    assert data["weather"] == "多云"
+
+
+def test_weather_api_falls_back_for_unknown_city(client):
+    response = client.get("/api/weather?city=未知城市")
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["city"] == "未知城市"
+    assert data["source"] == "mock"
 
 
 def test_scene_api_list_and_run(client, auth_headers, testing_session_factory):

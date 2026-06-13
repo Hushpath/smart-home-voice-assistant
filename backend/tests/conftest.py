@@ -6,6 +6,19 @@ from sqlalchemy.orm import sessionmaker
 from app.db.init_db import seed_initial_data
 from app.db.session import Base, get_db
 from app.main import app
+from app.services import home_actions
+
+
+@pytest.fixture(autouse=True)
+def disable_real_weather_requests(monkeypatch):
+    home_actions.clear_weather_cache()
+
+    def offline_weather(city_name):
+        raise ValueError(f"real weather disabled in tests: {city_name}")
+
+    monkeypatch.setattr(home_actions, "_fetch_open_meteo_weather", offline_weather)
+    yield
+    home_actions.clear_weather_cache()
 
 
 @pytest.fixture()
