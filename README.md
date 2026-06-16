@@ -1,14 +1,30 @@
 # 智能家居语音交互助手系统
 
-本项目是《软件工程》课程大作业，使用 Web 应用形式实现智能家居语音交互。前端负责页面展示和浏览器语音识别，后端负责用户认证、中文指令解析与执行、虚拟设备控制、提醒管理、天气查询、场景联动和操作日志。
+本项目是《软件工程》课程大作业，使用 Web 应用形式实现智能家居语音交互助手。系统包含 FastAPI 后端和 Vue 3 前端，支持用户认证、设备控制、提醒、天气、场景、操作日志、设备历史，以及可插拔语音控制链路。
+
+当前语音链路为：
+
+```text
+前端录音 / 浏览器语音识别 / 文本输入
+→ 后端 ASR Provider
+→ 方言/口音容错层
+→ 鲁棒指令解析
+→ 设备控制 / 场景 / 提醒 / 天气
+→ 操作日志和设备历史
+```
+
+云端 ASR 是可选增强；未配置云端 ASR 时，前端会提示使用浏览器 Web Speech API 或文本输入兜底。
 
 ## 功能特性
 
 - 用户注册、登录、JWT 鉴权和当前用户查询。
 - Dashboard 展示房间、设备、天气、场景和最近指令日志。
 - 房间与设备查询，支持设备手动开关和状态历史查看。
-- 中文指令解析与执行，支持设备控制、状态查询、场景执行、提醒创建和天气查询。
-- 语音控制页支持浏览器 Web Speech API，也保留文本输入兜底。
+- 三种指令输入路径：云端 ASR 音频上传、浏览器 Web Speech API、文本输入兜底。
+- 可插拔 ASR Provider：当前提供云端 Provider 框架和测试用 Mock Provider。
+- 方言/口音容错层：重点增强粤语，轻量支持西南、东北/北方口语。
+- 鲁棒中文指令解析与执行，支持设备控制、状态查询、场景执行、提醒创建和天气查询。
+- 操作日志记录 trace_id、ASR、方言归一、解析和执行全过程。
 - 提醒事项创建、查询、修改和删除。
 - 场景模式执行，当前包含回家模式、睡眠模式和离家模式。
 - 天气查询优先使用 Open-Meteo，失败时自动回退本地备用数据。
@@ -54,12 +70,20 @@ software/
 │   │   ├── db/
 │   │   ├── models/
 │   │   ├── routers/
+│   │   │   ├── commands.py
+│   │   │   └── voice.py
 │   │   ├── schemas/
 │   │   ├── services/
+│   │   │   ├── asr_providers/
+│   │   │   ├── command_executor.py
+│   │   │   ├── command_parser.py
+│   │   │   ├── dialect_normalizer.py
+│   │   │   └── speech_recognition_service.py
 │   │   ├── utils/
 │   │   └── main.py
 │   ├── data/
 │   ├── docs/
+│   ├── scripts/
 │   ├── tests/
 │   ├── requirements.txt
 │   ├── run.py
@@ -68,7 +92,6 @@ software/
 │   ├── src/
 │   │   ├── api/
 │   │   ├── components/
-│   │   ├── config/
 │   │   ├── router/
 │   │   ├── stores/
 │   │   ├── styles/
@@ -77,16 +100,15 @@ software/
 │   ├── package.json
 │   ├── vite.config.js
 │   └── README.md
+├── AGENTS.md
 └── README.md
 ```
 
 ## 快速开始
 
-### 从零运行步骤
+### 1. 初始化并启动后端
 
-拉取仓库后，在项目根目录依次执行以下步骤。
-
-1. 安装后端依赖并初始化数据库：
+推荐方式是创建本地虚拟环境：
 
 ```bash
 cd backend
@@ -94,11 +116,6 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 python -m app.db.init_db
-```
-
-2. 启动后端服务：
-
-```bash
 python run.py
 ```
 
@@ -120,7 +137,9 @@ http://127.0.0.1:8000/docs
 http://127.0.0.1:8000/api/health
 ```
 
-3. 新开一个终端，安装并启动前端：
+### 2. 启动前端
+
+新开一个终端：
 
 ```bash
 cd frontend
@@ -136,14 +155,50 @@ http://127.0.0.1:5173
 
 前端默认使用 Vite 代理，请求 `/api` 会转发到 `http://127.0.0.1:8000`。
 
-4. 浏览器访问前端地址，并使用默认账号登录。
-
 ## 默认账号
 
 ```text
 用户名：testuser
 密码：test123456
 ```
+
+## 云端 ASR 配置
+
+云端 ASR 只由后端调用，前端不会直接连接云端厂商，也不会保存 API Key。
+
+可通过后端运行环境变量配置：
+
+```env
+ASR_PROVIDER=xunfei
+ASR_BASE_URL=wss://iat-api.xfyun.cn/v2/iat
+ASR_API_KEY=你的讯飞 APIKey
+ASR_SECRET_KEY=你的讯飞 APISecret
+ASR_APP_ID=你的讯飞 AppID
+ASR_TIMEOUT_SECONDS=10
+ASR_ENABLE_CLOUD=true
+```
+
+当前代码直接读取进程环境变量，不会自动加载 `.env` 文件。如果希望使用 `.env` 文件，需要先在启动脚本或终端中把变量加载到环境中，或后续接入 `python-dotenv` 等配置加载方式。
+
+当前已适配讯飞语音听写 WebAPI：`ASR_PROVIDER=xunfei` 或 `ASR_PROVIDER=iflytek` 时，后端会使用讯飞 WebSocket 鉴权、分帧上传和结果解析。`ASR_BASE_URL` 可省略，默认使用 `wss://iat-api.xfyun.cn/v2/iat`。`ASR_API_KEY` 对应讯飞 APIKey，`ASR_SECRET_KEY` 对应 APISecret，`ASR_APP_ID` 对应 AppID。
+
+项目仍保留通用 HTTP cloud 框架：`ASR_PROVIDER=cloud` 时会按通用 multipart HTTP 请求调用 `ASR_BASE_URL`，适合后续接入其他厂商或自建代理。
+
+讯飞语音听写不支持浏览器默认 `audio/webm` 直接上传。当前后端只接受 `audio/wav` 或 `audio/mpeg` 走讯飞；前端在讯飞模式下会使用 Web Audio 采集语音并编码为 wav 上传。项目不会引入 ffmpeg、pydub 等大型转码依赖。
+
+云端未配置时，`/api/voice/execute` 返回 `ASR_PROVIDER_NOT_CONFIGURED`，前端提示使用浏览器识别或文本输入兜底。
+
+常见错误码：
+
+- `ASR_PROVIDER_NOT_CONFIGURED`
+- `ASR_TIMEOUT`
+- `ASR_AUTH_FAILED`
+- `ASR_EMPTY_TRANSCRIPT`
+- `ASR_REQUEST_FAILED`
+- `ASR_INVALID_RESPONSE`
+- `ASR_UNSUPPORTED_AUDIO_FORMAT`
+
+`MockASRProvider` 只用于 pytest、smoke test 或本地开发测试，不作为前端可选识别方式。
 
 ## 常用命令
 
@@ -154,6 +209,7 @@ cd backend
 python -m app.db.init_db
 python run.py
 python -m pytest
+python scripts/smoke_test.py
 ```
 
 前端：
@@ -169,8 +225,8 @@ npm run build
 - `/login`：登录页。
 - `/dashboard`：系统概览。
 - `/devices`：设备管理和设备历史。
-- `/voice`：语音控制和文本指令执行。
-- `/logs`：指令执行日志。
+- `/voice`：语音控制页，支持云端录音、浏览器识别和文本输入。
+- `/logs`：指令执行日志，列表展示摘要，详情展示完整链路。
 - `/reminders`：提醒管理。
 - `/scenes`：场景模式。
 
@@ -195,6 +251,9 @@ npm run build
 - `POST /api/commands/parse`
 - `POST /api/commands/execute`
 - `GET /api/commands/logs`
+- `GET /api/voice/providers`
+- `POST /api/voice/recognize`
+- `POST /api/voice/execute`
 - `GET /api/reminders`
 - `POST /api/reminders`
 - `PATCH /api/reminders/{reminder_id}`
@@ -202,7 +261,7 @@ npm run build
 - `GET /api/scenes`
 - `POST /api/scenes/{scene_id}/run`
 
-成功响应格式：
+统一响应格式：
 
 ```json
 {
@@ -213,18 +272,67 @@ npm run build
 }
 ```
 
-错误响应格式：
+## 语音控制架构
 
-```json
-{
-  "success": false,
-  "code": "ERROR_CODE",
-  "message": "错误信息",
-  "data": null
-}
+系统保留三种输入路径：
+
+1. 智能语音控制：前端使用 MediaRecorder 录音，上传到 `/api/voice/execute`，后端调用 ASR Provider 后执行指令。
+2. 浏览器识别：前端使用 Web Speech API 得到文本，再调用 `/api/commands/execute`。
+3. 文本输入：用户直接输入文本并调用 `/api/commands/execute`。
+
+后端统一执行：
+
+```text
+ASR transcript / 浏览器识别文本 / 文本输入
+→ DialectNormalizer
+→ CommandParser
+→ CommandExecutor
 ```
 
-## 语音指令示例
+前端语音控制页只展示“听取指令、理解语音、执行控制、完成反馈”的主流程；transcript、normalized_text、dialect_matches、intent_scores 和原始 JSON 等调试信息放在日志详情中。
+
+## 方言/口音容错
+
+`DialectNormalizer` 位于 ASR 和 `CommandParser` 之间，不直接决定业务执行，只输出标准化文本和归一化详情。
+
+支持模式：
+
+- `auto`
+- `mandarin`
+- `cantonese`
+- `southwest`
+- `northeast`
+
+粤语重点增强示例：
+
+- 冷气 / 冷氣 -> 空调
+- 电灯 / 電燈 -> 灯
+- 熄灯 / 熄燈 -> 关闭灯
+- 声量 / 聲量 -> 音量
+- 光度 -> 亮度
+- 食药 / 食藥 -> 吃药
+- 瞓觉模式 / 瞓覺模式 -> 睡眠模式
+- 返屋企模式 -> 回家模式
+
+其他口音轻量支持示例：
+
+- 开哈 -> 打开
+- 关哈 -> 关闭
+- 开开 -> 打开
+- 关上 -> 关闭
+- 整亮点 -> 设置亮度
+
+ASR 常见错词示例：
+
+- 客厅等 -> 客厅灯
+- 卧室等 -> 卧室灯
+- 空条 / 空跳 -> 空调
+- 音凉 -> 音量
+- 两度 -> 亮度
+
+## 指令示例
+
+普通指令：
 
 - 打开客厅灯
 - 关闭卧室空调
@@ -234,40 +342,41 @@ npm run build
 - 查看客厅设备状态
 - 开启睡眠模式
 - 开启回家模式
-- 开启离家模式
 - 提醒我晚上八点吃药
-- 提醒我20:00吃药
-- 查询今天的天气
 - 查询北京天气
 
-鲁棒性示例：
+粤语/方言演示指令：
 
-- 开一下客厅电灯
-- 帮我打开客厅灯
-- 客厅灯开一下
-- 把卧室空调调到二十六度
-- 将客厅灯亮度调到八十
-- 把电视机音量调到三十
+- 帮我打开客厅冷气
+- 熄客厅灯
+- 熄客廳燈
+- 将电视机声量调到三十
+- 将客厅灯光亮度调到八十
+- 提醒我今晚八点食药
+- 开启瞓觉模式
+- 开启返屋企模式
+- 开哈客厅灯
+- 客厅灯开开
 - 打开客厅等
-- 卧室冷气调到二十六度
+- 卧室空条调到二十六度
 
-## 鲁棒语音指令解析算法
+## 操作日志与 trace_id
 
-后端不处理音频文件，只处理浏览器识别后的中文文本。解析流程为：
+每次指令执行都会尽量生成唯一 `trace_id`，语音链路格式为：
 
 ```text
-语音输入 -> 识别文本 -> 文本标准化 -> 同义词归一 -> 中文数字转换 -> 意图打分 -> 房间/设备匹配 -> 参数校验 -> 置信度计算 -> 指令执行
+voice_YYYYMMDD_HHMMSS_random
 ```
 
-当前解析能力包括：
+日志详情记录：
 
-- 文本标准化：去除常见标点和口语词，例如“请”“帮我”“麻烦”“一下”。
-- 同义词归一：开启/启动/开一下归一为打开，冷气归一为空调，电视机归一为电视，声音归一为音量。
-- 中文数字转换：二十六、八十、三十等可转换为数字参数，晚上八点可解析为 `20:00`。
-- 意图打分：根据动作词、设备词、房间词、数值词和单位词计算各意图得分。
-- 模糊匹配：优先精确匹配，再做别名匹配，最后用轻量字符串相似度处理少量识别误差。
-- 参数校验：温度范围 `16-30`，亮度和音量范围 `0-100`，越界不会执行。
-- 置信度输出：解析结果包含 `confidence`、`matched_keywords`、`match_type` 和 `parse_detail`，日志详情可查看完整解析过程。
+- 输入来源：`cloud_asr`、`browser_speech`、`text_input`
+- ASR 信息：provider、transcript、confidence、latency、raw_result、错误码
+- 方言归一：detected_dialect、normalized_text、dialect_matches、asr_corrections、number_conversions、removed_fillers
+- 指令解析：intent、room、device_type、value、scene、reminder、city、intent_scores、matched_keywords、match_type
+- 执行结果：success、code、message、device_before、device_after、affected_devices、execution_latency_ms
+
+`CommandExecutor` 是主要日志写入入口，避免一次执行重复写入多条 `command_logs`。
 
 ## 数据库说明
 
@@ -299,28 +408,22 @@ backend/data/app.db
 GET /api/weather?city=北京
 ```
 
-支持城市示例：
-
-- 北京
-- 上海
-- 广州
-- 深圳
-- 杭州
-- 南京
-- 成都
-- 重庆
-- 西安
-- 武汉
-
 天气数据优先使用 Open-Meteo。外部请求失败、超时或城市无法识别时，后端会返回本地备用数据，并在返回字段中标记 `source: "mock"`。
 
-## 测试
+## 测试与验收
 
 运行后端测试：
 
 ```bash
 cd backend
 python -m pytest
+```
+
+运行后端 smoke test：
+
+```bash
+cd backend
+python scripts/smoke_test.py
 ```
 
 运行前端构建检查：
@@ -330,11 +433,44 @@ cd frontend
 npm run build
 ```
 
+推荐演示流程：
+
+1. 初始化数据库并启动后端。
+2. 启动前端并使用默认账号登录。
+3. 查看 Dashboard 和设备页。
+4. 打开语音控制页，确认 `/api/voice/providers` 状态。
+5. 执行文本指令“打开客厅灯”。
+6. 执行“把卧室空调调到26度”。
+7. 执行粤语/方言指令“帮我打开客厅冷气”“将电视机声量调到三十”“开启瞓觉模式”。
+8. 创建提醒“提醒我今晚八点食药”。
+9. 查看操作日志列表和日志详情。
+10. 查看设备历史。
+
+推荐截图：
+
+- 登录页
+- Dashboard
+- 语音控制页
+- 语音能力状态
+- 粤语指令执行结果
+- 日志列表
+- 日志详情
+- 设备页
+- 设备历史
+- pytest 通过
+- npm run build 通过
+- smoke test 通过
+
 ## 已知限制
 
+- 系统不训练自己的语音识别模型。
+- 云端 ASR 需要 API Key 和网络；当前已适配讯飞语音听写，其他厂商仍需按官方文档扩展。
+- 未配置云端 ASR 时，应使用浏览器识别或文本输入兜底。
+- 方言支持是有限场景下的指令容错，不是完整方言自然对话。
+- 粤语是重点增强，但不是完整粤语对话系统。
 - 系统使用 SQLite 中的虚拟设备，不接入真实智能家居硬件。
-- 后端只接收前端识别后的中文文本，不处理音频文件。
-- 语音识别依赖浏览器 Web Speech API 支持。
+- 低置信度二次确认机制暂未实现。
+- `MockASRProvider` 只用于测试和本地开发。
 - 提醒模块只支持数据管理，不包含后台通知或定时推送。
 - 天气查询依赖外网时可能失败，但会自动回退本地备用数据，保证演示稳定。
 

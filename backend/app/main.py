@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
-from app.routers import auth, commands, devices, health, reminders, scenes, weather
+from app.routers import auth, commands, devices, health, reminders, scenes, voice, weather
 from app.utils.response import error_response
 
 
@@ -49,3 +49,4 @@ app.include_router(commands.router, prefix=settings.api_prefix)
 app.include_router(reminders.router, prefix=settings.api_prefix)
 app.include_router(weather.router, prefix=settings.api_prefix)
 app.include_router(scenes.router, prefix=settings.api_prefix)
+app.include_router(voice.router, prefix=settings.api_prefix)

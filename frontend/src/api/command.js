@@ -1,11 +1,17 @@
 import request from './request'
 
 export function parseCommandApi(command, options = {}) {
-  return request.post('/commands/parse', { command }, { rawEnvelope: Boolean(options.rawEnvelope) })
+  return request.post('/commands/parse', { command }, {
+    rawEnvelope: Boolean(options.rawEnvelope),
+    suppressErrorMessage: Boolean(options.suppressErrorMessage)
+  })
 }
 
 export function executeCommandApi(command, options = {}) {
-  return request.post('/commands/execute', { command }, { rawEnvelope: Boolean(options.rawEnvelope) })
+  return request.post('/commands/execute', { command }, {
+    rawEnvelope: Boolean(options.rawEnvelope),
+    suppressErrorMessage: Boolean(options.suppressErrorMessage)
+  })
 }
 
 export function getCommandLogsApi() {

@@ -49,18 +49,59 @@ export function normalizeDashboard(dashboard = {}) {
 
 export function normalizeCommandLog(log = {}) {
   const parsedResult = normalizeParsedCommand(log.parsed_result || {})
+  const detail = normalizeLogDetail(log.detail || {}, parsedResult, log.execution_result || null)
+  const confidence = typeof log.confidence === 'number' ? log.confidence : parsedResult.confidence
   return {
     id: log.id,
     userId: log.user_id,
+    traceId: log.trace_id || detail.asr.trace_id || '-',
+    commandText: cleanText(log.command_text || log.raw_command),
     rawCommand: log.raw_command || '-',
-    intent: parsedResult.intent || '-',
-    confidence: parsedResult.confidence,
-    confidenceLabel: parsedResult.confidenceLabel,
+    inputSource: log.input_source || detail.asr.input_source || 'text',
+    inputSourceLabel: getInputSourceLabel(log.input_source || detail.asr.input_source || 'text'),
+    asrProvider: cleanText(log.asr_provider || detail.asr.asr_provider),
+    intent: cleanText(log.intent || parsedResult.intent),
+    room: cleanText(log.room || parsedResult.room),
+    deviceType: cleanText(log.device_type || parsedResult.device_type),
+    confidence,
+    confidenceLabel: getConfidenceLabel(confidence),
     parsedResult,
     executionResult: log.execution_result || null,
     success: Boolean(log.success),
+    message: cleanText(log.message || detail.execution.message),
     errorMessage: log.error_message || '',
-    createdAt: log.created_at || null
+    createdAt: log.created_at || null,
+    detail
+  }
+}
+
+export function normalizeLogDetail(detail = {}, parsedResult = {}, executionResult = null) {
+  const parseDetail = parsedResult.parseDetail || parsedResult.parse_detail || {}
+  const normalization = detail.normalization || parseDetail.dialect_normalization || {}
+  const execution = detail.execution || executionResult || {}
+  return {
+    asr: detail.asr || {},
+    normalization,
+    parse: detail.parse || {
+      intent: parsedResult.intent,
+      room: parsedResult.room,
+      device_type: parsedResult.deviceType || parsedResult.device_type,
+      value: parsedResult.value,
+      scene: parsedResult.scene,
+      reminder_time: parsedResult.reminderTime || parsedResult.reminder_time,
+      reminder_content: parsedResult.reminderContent || parsedResult.reminder_content,
+      city: parsedResult.city,
+      intent_scores: parseDetail.intent_scores,
+      parser_confidence: parsedResult.confidence,
+      matched_keywords: parsedResult.matchedKeywords || parsedResult.matched_keywords || [],
+      match_type: parsedResult.matchType || parsedResult.match_type,
+      message: parsedResult.message
+    },
+    execution,
+    raw: detail.raw || {
+      parsed_result: parsedResult,
+      execution_result: executionResult
+    }
   }
 }
 
@@ -99,6 +140,7 @@ export function normalizeCommandResult(result = {}) {
     success: result.success,
     code: result.code,
     message: result.message,
+    traceId: data.trace_id || null,
     parsed: data.parsed ? normalizeParsedCommand(data.parsed) : null,
     result: data.result || null,
     deviceBefore: data.device_before || data.result?.before_state || null,
@@ -108,6 +150,56 @@ export function normalizeCommandResult(result = {}) {
     weather: data.weather || data.result?.weather || null,
     scene: data.scene || data.result?.scene || null
   }
+}
+
+export function normalizeVoiceExecuteResult(result = {}) {
+  const data = result.data || result
+  const execution = data.execution || {}
+  const normalizedExecution = normalizeCommandResult({
+    success: result.success,
+    code: result.code,
+    message: result.message,
+    data: execution
+  })
+  return {
+    ...normalizedExecution,
+    traceId: data.trace_id || execution.trace_id || normalizedExecution.traceId,
+    recognition: data.recognition || null
+  }
+}
+
+export function normalizeVoiceProviderStatus(status = {}) {
+  const cloudConfigured = Boolean(status.cloud_configured)
+  const currentProvider = status.current_provider || 'cloud'
+  const providerLabel = currentProvider === 'xunfei' || currentProvider === 'iflytek' ? '讯飞 ASR' : '云端 ASR'
+  return {
+    currentProvider,
+    providerLabel,
+    cloudConfigured,
+    cloudStatus: cloudConfigured ? `${providerLabel} 可用` : '未配置',
+    cloudStatusType: cloudConfigured ? 'success' : 'warning',
+    availableProviders: status.available_providers || [],
+    browserFallbackSupported: Boolean(status.browser_fallback_supported),
+    browserSupported: typeof window !== 'undefined' && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition),
+    textFallbackSupported: status.text_fallback_supported !== false,
+    notes: status.notes || (cloudConfigured ? '云端语音识别可用。' : '云端语音识别未配置，请使用浏览器识别或文本输入。')
+  }
+}
+
+export function cleanText(value, fallback = '-') {
+  if (value === null || value === undefined || value === '') return fallback
+  if (typeof value === 'object') return formatJson(value)
+  return String(value)
+}
+
+export function getInputSourceLabel(source) {
+  const sourceMap = {
+    cloud_asr: '云端 ASR',
+    browser_speech: '浏览器识别',
+    text: '文本输入',
+    mock_asr: 'Mock ASR'
+  }
+  return sourceMap[source] || cleanText(source)
 }
 
 export function normalizeParsedCommand(parsed = {}) {

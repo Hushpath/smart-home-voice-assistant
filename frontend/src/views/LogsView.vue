@@ -4,10 +4,10 @@
       <div>
         <p class="panel-kicker">Command audit</p>
         <h2>操作日志</h2>
-        <p>展示后端 command_logs 表中当前用户的指令执行记录。</p>
+        <p>列表保留关键摘要，详情中展示 ASR、方言容错、解析和执行链路。</p>
       </div>
       <div class="toolbar-actions">
-        <el-input v-model="keyword" clearable placeholder="搜索指令或错误信息" />
+        <el-input v-model="keyword" clearable placeholder="搜索指令、trace_id 或错误信息" />
         <el-select v-model="statusFilter" style="width: 130px">
           <el-option label="全部结果" value="all" />
           <el-option label="成功" value="success" />
@@ -20,27 +20,33 @@
 
     <section class="glass-table-card">
       <el-table :data="pagedLogs" v-loading="loading" row-key="id" empty-text="暂无指令日志">
-        <el-table-column type="expand">
+        <el-table-column label="时间" width="170">
+          <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+        </el-table-column>
+        <el-table-column label="trace_id" min-width="190" show-overflow-tooltip>
+          <template #default="{ row }">{{ safe(row.traceId) }}</template>
+        </el-table-column>
+        <el-table-column label="原始指令" min-width="190" show-overflow-tooltip>
+          <template #default="{ row }">{{ safe(row.commandText || row.rawCommand) }}</template>
+        </el-table-column>
+        <el-table-column label="输入来源" width="120">
+          <template #default="{ row }">{{ safe(row.inputSourceLabel) }}</template>
+        </el-table-column>
+        <el-table-column label="ASR" width="110">
+          <template #default="{ row }">{{ safe(row.asrProvider) }}</template>
+        </el-table-column>
+        <el-table-column label="意图" width="130">
           <template #default="{ row }">
-            <div class="log-expand">
-              <div>
-                <label>解析结果</label>
-                <pre>{{ formatJson(row.parsedResult) }}</pre>
-              </div>
-              <div>
-                <label>执行结果</label>
-                <pre>{{ formatJson(row.executionResult) }}</pre>
-              </div>
-            </div>
+            <el-tag effect="plain" round>{{ safe(row.intent) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="rawCommand" label="指令文本" min-width="180" />
-        <el-table-column label="意图" width="150">
-          <template #default="{ row }">
-            <el-tag effect="plain" round>{{ row.intent || '-' }}</el-tag>
-          </template>
+        <el-table-column label="房间" width="100">
+          <template #default="{ row }">{{ safe(row.room) }}</template>
         </el-table-column>
-        <el-table-column label="置信度" width="130">
+        <el-table-column label="设备" width="110">
+          <template #default="{ row }">{{ safe(row.deviceType) }}</template>
+        </el-table-column>
+        <el-table-column label="置信度" width="120">
           <template #default="{ row }">
             <span v-if="row.confidence !== null && row.confidence !== undefined">
               {{ row.confidenceLabel }} {{ Math.round(row.confidence * 100) }}%
@@ -48,23 +54,19 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column label="执行摘要" min-width="220">
-          <template #default="{ row }">{{ summarizeCommandExecution(row.executionResult) }}</template>
-        </el-table-column>
-        <el-table-column label="结果" width="110">
+        <el-table-column label="结果" width="100">
           <template #default="{ row }">
             <el-tag :type="row.success ? 'success' : 'danger'" effect="dark" round>
               {{ row.success ? '成功' : '失败' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="errorMessage" label="错误信息" min-width="160" show-overflow-tooltip />
-        <el-table-column label="时间" width="180">
-          <template #default="{ row }">{{ formatDateTime(row.createdAt) }}</template>
+        <el-table-column label="消息" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">{{ safe(row.message || row.errorMessage) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="110" fixed="right">
+        <el-table-column label="操作" width="100" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click="openDetail(row)">详情</el-button>
+            <el-button link type="primary" @click="openDetail(row)">查看详情</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -79,56 +81,18 @@
       </div>
     </section>
 
-    <el-dialog v-model="detailVisible" title="解析详情" width="760px" destroy-on-close>
-      <div v-if="selectedLog" class="log-detail-dialog">
-        <div class="result-tags">
-          <span>原始文本：{{ selectedLog.parsedResult.originalText || selectedLog.rawCommand || '-' }}</span>
-          <span>标准化：{{ selectedLog.parsedResult.normalizedText || '-' }}</span>
-          <span>意图：{{ selectedLog.intent || '-' }}</span>
-          <span>置信度：{{ selectedLog.confidenceLabel }} {{ selectedLog.confidence !== null ? Math.round(selectedLog.confidence * 100) + '%' : '' }}</span>
-          <span>匹配方式：{{ selectedLog.parsedResult.matchType || '-' }}</span>
-        </div>
-        <div class="log-detail-grid">
-          <div>
-            <label>意图打分</label>
-            <pre>{{ formatJson(selectedLog.parsedResult.parseDetail?.intent_scores) }}</pre>
-          </div>
-          <div>
-            <label>关键词</label>
-            <pre>{{ formatJson(selectedLog.parsedResult.matchedKeywords) }}</pre>
-          </div>
-          <div>
-            <label>房间匹配</label>
-            <pre>{{ formatJson(selectedLog.parsedResult.parseDetail?.room_match) }}</pre>
-          </div>
-          <div>
-            <label>设备匹配</label>
-            <pre>{{ formatJson(selectedLog.parsedResult.parseDetail?.device_match) }}</pre>
-          </div>
-          <div>
-            <label>参数抽取</label>
-            <pre>{{ formatJson(selectedLog.parsedResult.parseDetail?.value_extract) }}</pre>
-          </div>
-          <div>
-            <label>执行结果</label>
-            <pre>{{ formatJson(selectedLog.executionResult) }}</pre>
-          </div>
-        </div>
-        <el-collapse>
-          <el-collapse-item title="Raw JSON" name="raw">
-            <pre>{{ formatJson(selectedLog) }}</pre>
-          </el-collapse-item>
-        </el-collapse>
-      </div>
-    </el-dialog>
+    <LogDetailDrawer v-model="detailVisible" :log="selectedLog" />
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { getCommandLogsApi } from '../api/command'
-import { formatDateTime, formatJson, normalizeCommandLog, summarizeCommandExecution } from '../utils/normalizers'
+import LogDetailDrawer from '../components/LogDetailDrawer.vue'
+import { cleanText, formatDateTime, formatJson, normalizeCommandLog, summarizeCommandExecution } from '../utils/normalizers'
 
+const route = useRoute()
 const loading = ref(false)
 const logs = ref([])
 const keyword = ref('')
@@ -146,11 +110,18 @@ const filteredLogs = computed(() => {
       (statusFilter.value === 'success' && log.success) ||
       (statusFilter.value === 'failed' && !log.success)
     const haystack = [
+      log.traceId,
+      log.commandText,
       log.rawCommand,
+      log.inputSourceLabel,
+      log.asrProvider,
+      log.intent,
+      log.room,
+      log.deviceType,
+      log.message,
       log.errorMessage,
       summarizeCommandExecution(log.executionResult),
-      formatJson(log.parsedResult),
-      formatJson(log.executionResult)
+      formatJson(log.detail)
     ].join(' ').toLowerCase()
     return matchStatus && (!text || haystack.includes(text))
   })
@@ -173,14 +144,19 @@ async function loadLogs() {
 }
 
 function exportLogs() {
-  const headers = ['ID', '指令文本', '意图', '执行摘要', '结果', '错误信息', '创建时间']
+  const headers = ['ID', 'trace_id', '指令文本', '输入来源', 'ASR', '意图', '房间', '设备', '置信度', '结果', '消息', '创建时间']
   const rows = filteredLogs.value.map((log) => [
     log.id,
-    log.rawCommand,
-    log.intent || '-',
-    summarizeCommandExecution(log.executionResult),
+    log.traceId,
+    log.commandText,
+    log.inputSourceLabel,
+    log.asrProvider,
+    log.intent,
+    log.room,
+    log.deviceType,
+    log.confidence === null || log.confidence === undefined ? '' : `${Math.round(log.confidence * 100)}%`,
     log.success ? '成功' : '失败',
-    log.errorMessage || '',
+    log.message || log.errorMessage,
     formatDateTime(log.createdAt)
   ])
   const csv = [headers, ...rows]
@@ -200,9 +176,16 @@ function openDetail(log) {
   detailVisible.value = true
 }
 
+function safe(value) {
+  return cleanText(value)
+}
+
 watch([keyword, statusFilter], () => {
   currentPage.value = 1
 })
 
-onMounted(loadLogs)
+onMounted(() => {
+  if (route.query.trace_id) keyword.value = String(route.query.trace_id)
+  loadLogs()
+})
 </script>

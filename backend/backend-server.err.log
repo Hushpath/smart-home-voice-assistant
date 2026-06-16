@@ -1,0 +1,46 @@
+INFO:     Will watch for changes in these directories: ['D:\\mawjt\\Desktop\\software\\backend']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [19092] using WatchFiles
+INFO:     Started server process [24044]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app\services\asr_providers\cloud_provider.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [24044]
+WARNING:  WatchFiles detected changes in 'app\services\speech_recognition_service.py', 'app\services\asr_providers\cloud_provider.py', 'app\routers\voice.py'. Reloading...
+INFO:     Started server process [6676]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [6676]
+INFO:     Started server process [21464]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests\test_cloud_asr_provider.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [21464]
+WARNING:  WatchFiles detected changes in '.venv\Lib\site-packages\websocket\_cookiejar.py', '.venv\Lib\site-packages\websocket\_http.py', '.venv\Lib\site-packages\websocket\tests\test_ssl_compat.py', '.venv\Lib\site-packages\websocket\_socket.py', '.venv\Lib\site-packages\websocket\_utils.py', '.venv\Lib\site-packages\websocket\tests\test_cookiejar.py', '.venv\Lib\site-packages\websocket\tests\test_websocket.py', '.venv\Lib\site-packages\websocket\tests\test_app.py', '.venv\Lib\site-packages\websocket\_logging.py', '.venv\Lib\site-packages\websocket\tests\echo-server.py', '.venv\Lib\site-packages\websocket\tests\test_socket.py', '.venv\Lib\site-packages\websocket\_ssl_compat.py', '.venv\Lib\site-packages\websocket\_core.py', '.venv\Lib\site-packages\websocket\tests\test_abnf.py', '.venv\Lib\site-packages\websocket\_url.py', '.venv\Lib\site-packages\websocket\_abnf.py', '.venv\Lib\site-packages\websocket\tests\test_dispatcher.py', '.venv\Lib\site-packages\websocket\__init__.py', '.venv\Lib\site-packages\websocket\_wsdump.py', '.venv\Lib\site-packages\websocket\_app.py', '.venv\Lib\site-packages\websocket\tests\__init__.py', '.venv\Lib\site-packages\websocket\tests\test_handshake_large_response.py', '.venv\Lib\site-packages\websocket\tests\test_http.py', '.venv\Lib\site-packages\websocket\tests\test_ssl_edge_cases.py', '.venv\Lib\site-packages\websocket\tests\test_utils.py', '.venv\Lib\site-packages\websocket\tests\test_large_payloads.py', '.venv\Lib\site-packages\websocket\_dispatcher.py', '.venv\Lib\site-packages\websocket\_exceptions.py', '.venv\Lib\site-packages\websocket\_handshake.py', '.venv\Lib\site-packages\websocket\tests\test_url.py', '.venv\Lib\site-packages\websocket\tests\test_socket_bugs.py'. Reloading...
+INFO:     Started server process [27480]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [27480]
+INFO:     Started server process [18296]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app\services\asr_providers\cloud_provider.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [18296]
+INFO:     Started server process [23556]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.

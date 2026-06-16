@@ -37,7 +37,7 @@ request.interceptors.response.use(
     if (body && typeof body.success === 'boolean') {
       if (response.config.rawEnvelope) return body
       if (body.success) return body.data
-      ElMessage.error(body.message || '请求失败')
+      if (!response.config.suppressErrorMessage) ElMessage.error(body.message || '请求失败')
       return Promise.reject(Object.assign(new Error(body.message || '请求失败'), { payload: body }))
     }
     return body
@@ -63,7 +63,9 @@ request.interceptors.response.use(
       return Promise.reject(Object.assign(error, { payload }))
     }
 
-    ElMessage.error(payload?.message || error.message || '请求失败')
+    if (!error.config?.suppressErrorMessage) {
+      ElMessage.error(payload?.message || error.message || '请求失败')
+    }
     return Promise.reject(Object.assign(error, { payload }))
   }
 )

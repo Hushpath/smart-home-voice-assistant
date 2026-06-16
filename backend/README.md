@@ -35,6 +35,8 @@ backend/
 
 ## 安装依赖
 
+推荐方式是创建本地虚拟环境：
+
 ```bash
 cd backend
 python -m venv .venv
@@ -134,6 +136,9 @@ POST /api/auth/login
 - `POST /api/commands/parse`：解析中文文本指令，需要登录，不执行设备控制。
 - `POST /api/commands/execute`：解析并执行中文指令，需要登录。
 - `GET /api/commands/logs`：查询当前用户指令执行日志。
+- `GET /api/voice/providers`：查询后端云端 ASR 配置状态，需要登录。
+- `POST /api/voice/recognize`：上传音频并转写为中文文本，需要登录，不执行设备控制。
+- `POST /api/voice/execute`：上传音频、转写、解析并执行语音指令，需要登录。
 - `GET /api/reminders`：查询提醒列表。
 - `POST /api/reminders`：创建提醒。
 - `PATCH /api/reminders/{reminder_id}`：修改提醒。
@@ -144,16 +149,242 @@ POST /api/auth/login
 
 ## 前后端对接说明
 
-前端使用 Vue 3 和浏览器 Web Speech API 进行真实语音识别，后端不接收音频文件，只接收前端识别后的中文文本。
+前端使用 Vue 3 和浏览器 Web Speech API 进行本地语音识别时，仍可调用已有中文指令接口提交识别后的文本。云端 ASR 音频识别统一通过后端 `/api/voice/*` 接口转发，前端不直接连接云端 ASR。
 
 推荐对接流程：
 
 1. 前端调用 `POST /api/auth/login` 获取 `access_token`。
 2. 前端在受保护接口请求头加入 `Authorization: Bearer <access_token>`。
-3. 语音识别得到中文文本后，前端调用 `POST /api/commands/parse` 做解析预览，或调用 `POST /api/commands/execute` 直接执行。
+3. 浏览器语音识别得到中文文本后，前端调用 `POST /api/commands/parse` 做解析预览，或调用 `POST /api/commands/execute` 直接执行。
 4. 前端可通过 `GET /api/devices`、`GET /api/rooms`、`GET /api/dashboard` 刷新设备和统计状态。
 5. 天气接口 `GET /api/weather` 可不登录调用；通过指令执行触发天气查询时仍需要登录。
 6. 天气接口不改变调用路径，示例：`GET /api/weather?city=北京`。后端优先请求 Open-Meteo，3 秒超时；网络失败、超时或城市无法识别时返回本地备用数据。
+
+## 可插拔语音控制架构说明
+
+当前后端新增了可插拔 ASR Provider 基础架构，目标是让云端音频识别、浏览器识别结果和文本输入共存，而不是让前端直接连接云端厂商。
+
+处理链路：
+
+```text
+前端上传音频 -> 后端 ASR Provider -> transcript -> 方言/口音容错扩展点 -> CommandParser -> CommandExecutor -> command_logs
+```
+
+职责划分：
+
+- 前端不直接调用云端 ASR，不在前端保存 API Key、Secret 或 App ID。
+- 后端封装 `ASRProvider` 抽象，统一提供 `name`、`is_configured()` 和 `recognize(audio_bytes, filename, content_type, dialect, trace_id)`。
+- 云端 ASR 只负责把音频转成文本，不负责设备控制、场景、提醒或天气。
+- 后端继续负责方言容错、中文指令解析和指令执行；方言容错由 `DialectNormalizer` 统一处理并写入日志详情。
+- 浏览器 Web Speech API 识别结果和手动文本输入仍作为兜底路径，继续使用已有 `/api/commands/parse`、`/api/commands/execute`。
+- API Key、Secret、App ID 从环境变量读取，不写入源码。
+- `MockASRProvider` 只用于 pytest、smoke test 或本地开发测试，不能作为前端用户可选择的识别方式。
+- 每次 `/api/voice/recognize` 和 `/api/voice/execute` 都生成 `voice_YYYYMMDD_HHMMSS_random` 格式的 `trace_id`，用于串联识别、解析、执行和日志。
+
+云端 ASR 环境变量：
+
+```text
+ASR_PROVIDER=xunfei
+ASR_BASE_URL=wss://iat-api.xfyun.cn/v2/iat
+ASR_API_KEY=your-xunfei-api-key
+ASR_SECRET_KEY=your-xunfei-api-secret
+ASR_APP_ID=your-xunfei-app-id
+ASR_TIMEOUT_SECONDS=10
+ASR_ENABLE_CLOUD=true
+```
+
+当前代码直接读取进程环境变量，不会自动加载 `.env` 文件。如果希望使用 `.env` 文件，需要先在启动脚本或终端中把变量加载到环境中，或后续接入 `python-dotenv` 等配置加载方式。
+
+当前已选择并适配讯飞语音听写；其他厂商仍只保留通用请求框架，必须按官方文档再实现签名、请求参数和响应解析。
+
+音频接口支持的 content type：
+
+- `audio/webm`
+- `audio/wav`
+- `audio/mpeg`
+
+当云端 ASR 未配置时，`GET /api/voice/providers` 会返回 `cloud_configured=false`，并提示可使用浏览器识别或文本输入兜底。`POST /api/voice/recognize` 与 `POST /api/voice/execute` 会返回统一错误 `ASR_PROVIDER_NOT_CONFIGURED`。
+
+### 云端 ASR 配置说明
+
+前端不直接调用云端 ASR，原因是 API Key、Secret、App ID 等敏感配置不能暴露在浏览器中。前端只负责录音和上传音频，后端统一完成配置校验、云端请求、超时处理和错误映射。
+
+后端运行环境变量示例：
+
+```text
+ASR_PROVIDER=xunfei
+ASR_BASE_URL=wss://iat-api.xfyun.cn/v2/iat
+ASR_API_KEY=your-xunfei-api-key
+ASR_SECRET_KEY=your-xunfei-api-secret
+ASR_APP_ID=your-xunfei-app-id
+ASR_TIMEOUT_SECONDS=10
+ASR_ENABLE_CLOUD=true
+```
+
+当前代码直接读取进程环境变量，不会自动加载 `.env` 文件。如果希望使用 `.env` 文件，需要先在启动脚本或终端中把变量加载到环境中，或后续接入 `python-dotenv` 等配置加载方式。
+
+不要把这些密钥写进前端源码、后端源码或代码仓库。
+
+### 讯飞语音听写
+
+本项目已适配讯飞语音听写 WebAPI。配置 `ASR_PROVIDER=xunfei` 或 `ASR_PROVIDER=iflytek` 后，`CloudASRProvider` 会使用讯飞 WebSocket 鉴权、分帧上传和结果解析。`ASR_BASE_URL` 可省略，默认值是：
+
+```text
+wss://iat-api.xfyun.cn/v2/iat
+```
+
+环境变量对应关系：
+
+- `ASR_APP_ID`：讯飞控制台 AppID。
+- `ASR_API_KEY`：讯飞控制台 APIKey。
+- `ASR_SECRET_KEY`：讯飞控制台 APISecret。
+- `ASR_TIMEOUT_SECONDS`：WebSocket 连接和识别超时时间。
+
+当前不做音频转码，不引入 ffmpeg、pydub 等大型依赖。讯飞路径只接受：
+
+- `audio/wav`
+- `audio/mpeg`
+
+浏览器 `MediaRecorder` 常见默认格式是 `audio/webm`，讯飞语音听写不能直接识别该格式。当前前端会在讯飞模式下使用 Web Audio 采集语音并编码为 wav 上传；浏览器识别和文本输入仍作为兜底。
+
+`ASR_PROVIDER=cloud` 仍保留通用 HTTP multipart 调用框架，用于后续接入其他厂商或自建 ASR 代理。
+
+`GET /api/voice/providers` 返回示例：
+
+```json
+{
+  "success": true,
+  "code": "OK",
+  "message": "语音识别配置状态",
+  "data": {
+    "current_provider": "xunfei",
+    "cloud_configured": false,
+    "cloud_status": {
+      "provider": "xunfei",
+      "configured_provider": "xunfei",
+      "base_url_configured": false,
+      "credentials_configured": false,
+      "app_id_configured": false,
+      "secret_key_configured": false,
+      "timeout_seconds": 10.0,
+      "enable_cloud": false,
+      "configured": false,
+      "missing_fields": ["ASR_ENABLE_CLOUD=true", "ASR_APP_ID", "ASR_API_KEY", "ASR_SECRET_KEY"]
+    },
+    "available_providers": [],
+    "browser_fallback_supported": true,
+    "text_fallback_supported": true,
+    "fallback": ["browser_speech", "text_input"],
+    "notes": "云端语音识别服务未配置，请使用浏览器识别或文本输入兜底。"
+  }
+}
+```
+
+未配置时，语音执行接口返回：
+
+```json
+{
+  "success": false,
+  "code": "ASR_PROVIDER_NOT_CONFIGURED",
+  "message": "云端语音识别服务未配置，请使用浏览器识别或文本输入兜底。",
+  "data": {
+    "trace_id": "voice_20260615_120000_abcd1234",
+    "input_source": "cloud_asr",
+    "asr_provider": "xunfei",
+    "success": false,
+    "error_code": "ASR_PROVIDER_NOT_CONFIGURED",
+    "error_message": "云端语音识别服务未配置，请使用浏览器识别或文本输入兜底。",
+    "latency_ms": 0,
+    "fallback": ["browser_speech", "text_input"]
+  }
+}
+```
+
+常见错误码：
+
+- `ASR_PROVIDER_NOT_CONFIGURED`：云端 ASR 未配置。
+- `ASR_TIMEOUT`：云端 ASR 请求超时。
+- `ASR_AUTH_FAILED`：云端认证失败，检查后端密钥配置。
+- `ASR_EMPTY_TRANSCRIPT`：云端返回空文本。
+- `ASR_REQUEST_FAILED`：云端请求失败或返回 HTTP 错误。
+- `ASR_INVALID_RESPONSE`：云端响应不是预期 JSON 结构。
+- `ASR_UNSUPPORTED_AUDIO_FORMAT`：音频格式不符合当前 provider 要求；讯飞路径只支持 `audio/wav`、`audio/mpeg`。
+
+当前 `CloudASRProvider` 已包含讯飞 WebSocket 实现，并保留通用 HTTP 请求框架。后续接入其他厂商时，建议新增具体 provider 或继承 `CloudASRProvider`，只在厂商官方文档明确后实现：
+
+- 请求路径和参数字段。
+- 官方签名算法。
+- 鉴权头或 token 获取方式。
+- 响应字段映射到 `transcript`、`confidence`、`duration`。
+- 厂商错误码到本项目统一错误码的映射。
+
+`MockASRProvider` 只能通过测试或本地开发显式启用，不作为前端可选识别方式。
+
+## 方言/口音容错设计说明
+
+本项目不训练方言 ASR 模型，也不把方言理解下放到前端。方言/口音容错层位于 ASR 和 `CommandParser` 之间，统一处理云端 ASR transcript、浏览器识别文本和手动文本输入：
+
+```text
+ASR transcript / 浏览器识别文本 / 文本输入
+-> DialectNormalizer
+-> CommandParser
+-> CommandExecutor
+```
+
+`DialectNormalizer` 只做文本归一和过程记录，不直接决定业务执行。输出会保留 `original_text`、`normalized_text`、`detected_dialect`、`dialect_matches`、`asr_corrections`、`removed_fillers`、`number_conversions` 和 `normalization_steps`。
+
+后端内部支持 `auto`、`mandarin`、`cantonese`、`southwest`、`northeast`。默认 `auto`：命中 `冷气`、`声量`、`熄灯`、`睇下`、`食药`、`瞓觉`、`返屋企` 等识别为粤语；命中 `开哈`、`关哈` 识别为西南口音；命中 `开开`、`关上` 识别为东北/北方口语；其他情况按普通话处理。
+
+粤语是当前重点支持方向：
+
+- 设备词：`冷气/冷氣 -> 空调`，`电灯/電燈/灯光/燈光 -> 灯`，`电视机/電視機 -> 电视`。
+- 动作词：`开灯/開燈 -> 打开灯`，`熄灯/熄燈/关灯/關燈 -> 关闭灯`，`较到/調到/调到/整到 -> 设置`。
+- 房间词：`客廳/大厅/大廳 -> 客厅`，`房/睡房 -> 卧室`，`廚房 -> 厨房`，`書房 -> 书房`。
+- 参数词：`声量/聲量/声音/聲音 -> 音量`，`光度 -> 亮度`，`度数/度數 -> 温度`。
+- 提醒、天气和场景：`今日 -> 今天`，`听日/聽日 -> 明天`，`睇下/睇吓 -> 查询`，`食药/食藥 -> 吃药`，`返屋企模式 -> 回家模式`，`瞓觉模式/瞓覺模式 -> 睡眠模式`。
+
+其他口音轻量支持：
+
+- 西南口音：`开哈 -> 打开`，`关哈 -> 关闭`，`整到/整成 -> 设置`，`冷气 -> 空调`。
+- 东北/北方口语：`开开 -> 打开`，`关上 -> 关闭`，`整到 -> 设置`，`整亮点 -> 设置亮度`。
+
+ASR 常见错词纠正包括：`客厅等 -> 客厅灯`、`卧室等 -> 卧室灯`、`空条/空跳 -> 空调`、`电视及 -> 电视机`、`音凉 -> 音量`、`两度 -> 亮度`、`二十留 -> 二十六`。中文数字转换复用现有指令解析中的中文数字逻辑，例如 `三十 -> 30`、`八十 -> 80`、`二十六 -> 26`、`晚上八点 -> 20:00`。
+
+置信度处理：ASR 错词纠正后仍继续解析，但会轻微降低 `confidence`，并把 `match_type` 标记为 `fuzzy`；多处模糊匹配会继续降低 `confidence`；低于 `0.6` 的设备控制、场景执行、提醒创建等会改变状态的指令不会执行；查询天气、查询状态等只读操作可以返回结果但提示置信度较低。当前不做低置信度二次确认机制。
+
+当前限制：方言词典是规则式轻量词典，不覆盖所有真实方言表达；未训练或微调语音识别模型；未接入真实智能家居硬件；暂未把方言模式暴露到前端主界面，默认使用 `auto`。
+
+## 操作日志与可解释链路说明
+
+`command_logs` 是指令执行的统一审计入口。后端不为一次语音执行重复写多条日志，而是由 `CommandExecutor` 在一次执行中写入一条记录，并把 voice 层、方言容错层和解析层传入的上下文保存到已有 JSON 字段：
+
+- `parsed_result`：保存指令解析结果、`parse_detail`、方言归一化详情和 context。
+- `execution_result`：保存执行结果、执行状态、错误信息、执行耗时和 context。
+
+`trace_id` 用于串联一次请求中的完整链路：
+
+```text
+trace_id
+-> ASR 识别信息
+-> DialectNormalizer 方言/口音容错
+-> CommandParser 指令解析
+-> CommandExecutor 执行结果
+-> command_logs 日志详情
+```
+
+文本指令会自动生成 `cmd_YYYYMMDD_HHMMSS_random` 格式的 `trace_id`。语音接口继续使用 `voice_YYYYMMDD_HHMMSS_random` 格式，并在 `/api/voice/execute` 中传入 `CommandExecutor`，因此 ASR、归一化、解析和执行结果能在同一条日志中查看。
+
+`GET /api/commands/logs` 同时保留旧字段和新增摘要字段。旧字段包括 `raw_command`、`parsed_result`、`execution_result`、`success`、`error_message`、`created_at`；新增摘要字段包括 `trace_id`、`command_text`、`input_source`、`asr_provider`、`intent`、`room`、`device_type`、`confidence`、`message` 和 `detail`。
+
+`detail` 按链路分块：
+
+- `asr`：输入来源、ASR provider、transcript、ASR 置信度、音频时长、ASR 耗时和 raw ASR 结果。
+- `normalization`：检测到的方言、标准化文本、方言词典命中、ASR 错词纠正、中文数字转换、过滤口语词和步骤记录。
+- `parse`：意图、房间、设备、参数、场景、提醒、天气、意图打分、解析置信度、关键词和匹配方式。
+- `execution`：成功状态、code、message、设备前后状态、影响设备、错误信息和执行耗时。
+- `raw`：原始 `parsed_result`、`execution_result` 和 context，便于调试和答辩展示。
+
+这种结构让语音控制主页面保持简洁，日志列表展示摘要，日志详情展示完整链路。对测试和维护也更直接：一个失败用例可以通过同一个 `trace_id` 定位是 ASR、方言归一、解析还是执行阶段的问题。
 
 统一成功响应：
 
@@ -425,6 +656,90 @@ POST /api/auth/login
 - 提醒 CRUD、天气查询、场景列表和场景执行。
 - 指令日志、设备状态历史、参数越界、不存在设备、不支持操作。
 - 请求参数校验和未知路径的统一错误返回。
+- 云端 ASR 配置状态、未配置错误、超时、认证失败、空文本、非法响应和不支持音频格式。
+- Mock ASR 测试路径、`/api/voice/providers`、`/api/voice/recognize`、`/api/voice/execute`。
+- 方言/口音容错，包括粤语词典、西南/东北轻量口音、ASR 错词纠正和中文数字转换。
+- 操作日志详情，包括 `trace_id`、ASR 信息、方言归一、解析结果、执行结果和避免重复日志。
+
+## Smoke Test
+
+后端提供一个只用于验收的 smoke test 脚本：
+
+```bash
+python scripts/smoke_test.py
+```
+
+该脚本使用临时 SQLite 数据库，不污染 `data/app.db`。它会在脚本进程内显式启用 `MockASRProvider`，验证：
+
+- `GET /api/health`
+- 默认账号登录
+- `GET /api/dashboard`
+- `GET /api/devices`
+- `POST /api/commands/execute`
+- `GET /api/voice/providers`
+- `POST /api/voice/execute` 使用 Mock ASR
+- `GET /api/commands/logs`
+- `GET /api/devices/{device_id}/history`
+
+`MockASRProvider` 只用于 pytest、smoke test 或本地开发验证，不作为前端主流程演示模式。
+
+## 部署与演示说明
+
+初始化数据库：
+
+```bash
+cd backend
+python -m app.db.init_db
+```
+
+启动后端：
+
+```bash
+cd backend
+python run.py
+```
+
+启动前端：
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+默认账号：
+
+```text
+用户名：testuser
+密码：test123456
+```
+
+推荐演示流程：
+
+1. 打开登录页，使用默认账号登录。
+2. 查看 Dashboard，确认房间、设备和天气摘要正常。
+3. 打开设备页，查看虚拟设备状态和设备历史入口。
+4. 打开语音控制页，查看云端 ASR、浏览器识别、文本输入三种能力状态。
+5. 云端 ASR 未配置时，展示“请使用浏览器识别或文本输入兜底”的提示。
+6. 使用文本兜底依次执行：`打开客厅灯`、`把卧室空调调到26度`、`帮我打开客厅冷气`、`将电视机声量调到三十`、`开启瞓觉模式`、`提醒我今晚八点食药`。
+7. 打开操作日志页，查看日志列表摘要。
+8. 打开一条日志详情，展示 ASR、方言容错、指令解析、执行结果和 raw JSON。
+9. 回到设备页，查看设备状态历史。
+
+推荐截图：
+
+- 登录页。
+- Dashboard。
+- 语音控制页。
+- 语音能力状态。
+- 粤语指令执行结果。
+- 操作日志列表。
+- 操作日志详情。
+- 设备页。
+- 设备历史。
+- `pytest` 通过结果。
+- `npm run build` 通过结果。
+- `python scripts/smoke_test.py` 通过结果。
 
 ## 初始化数据
 
@@ -434,9 +749,18 @@ POST /api/auth/login
 - 3 个场景：回家模式、睡眠模式、离家模式。
 - 1 个默认测试用户：`testuser`。
 
-## 当前阶段限制
+## 已知限制
 
-提醒模块只保存提醒事项，不做后台定时推送、系统通知、消息队列或长期后台任务。天气模块优先查询 Open-Meteo，失败时自动回退本地备用数据，确保无网络环境下仍可演示。
+- 系统不训练自己的语音识别模型。
+- 云端 ASR 需要 API Key、网络和厂商服务可用性。
+- 未配置云端 ASR 时，前端应使用浏览器 Web Speech API 或文本输入兜底。
+- 方言支持是有限场景下的指令容错，不是完整方言自然对话。
+- 粤语是重点增强方向，但不是完整粤语对话系统。
+- 真实智能家居硬件未接入，当前使用虚拟设备模拟。
+- 低置信度二次确认机制暂未实现。
+- `MockASRProvider` 只用于测试和开发，不作为前端用户可选择的识别方式。
+- 提醒模块只保存提醒事项，不做后台定时推送、系统通知、消息队列或长期后台任务。
+- 天气模块优先查询 Open-Meteo，失败时自动回退本地备用数据，确保无网络环境下仍可演示。
 
 ## 后续扩展方向
 
