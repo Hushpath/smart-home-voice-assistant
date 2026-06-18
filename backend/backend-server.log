@@ -1,179 +1,94 @@
-INFO:     127.0.0.1:6623 - "GET /api/health HTTP/1.1" 200 OK
-INFO:     127.0.0.1:13410 - "GET /api/dashboard HTTP/1.1" 401 Unauthorized
-INFO:     127.0.0.1:13414 - "GET /api/devices HTTP/1.1" 401 Unauthorized
-INFO:     127.0.0.1:13413 - "GET /api/commands/logs HTTP/1.1" 401 Unauthorized
-INFO:     127.0.0.1:13412 - "GET /api/scenes HTTP/1.1" 401 Unauthorized
-INFO:     127.0.0.1:11757 - "GET / HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:11757 - "GET /favicon.ico HTTP/1.1" 404 Not Found
-INFO:     127.0.0.1:13712 - "POST /api/auth/login HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7403 - "GET /api/weather?city=%E5%8C%97%E4%BA%AC HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7042 - "GET /api/dashboard HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7406 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7405 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7404 - "GET /api/scenes HTTP/1.1" 200 OK
-INFO:     127.0.0.1:3843 - "GET /api/rooms HTTP/1.1" 200 OK
-INFO:     127.0.0.1:3844 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:8755 - "PATCH /api/devices/8/state HTTP/1.1" 200 OK
-INFO:     127.0.0.1:5915 - "GET /api/rooms HTTP/1.1" 200 OK
-INFO:     127.0.0.1:5916 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:3515 - "PATCH /api/devices/8/state HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7922 - "GET /api/rooms HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7923 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:12594 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:12596 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:12595 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:9675 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:8107 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:8106 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:1504 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:5476 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:5473 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:2992 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:11942 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:11941 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:6315 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:3705 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:3704 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:5541 - "POST /api/commands/execute HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:10079 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:9532 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:9531 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:11947 - "POST /api/commands/execute HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:14694 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:3357 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:3356 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:6791 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:4491 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:4490 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:9762 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:10292 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:10291 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:8125 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:1504 - "GET /api/scenes HTTP/1.1" 200 OK
-INFO:     127.0.0.1:2354 - "GET /api/reminders HTTP/1.1" 200 OK
-INFO:     127.0.0.1:5370 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7210 - "GET /api/weather?city=%E5%8C%97%E4%BA%AC HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7209 - "GET /api/dashboard HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7212 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7213 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7211 - "GET /api/scenes HTTP/1.1" 200 OK
-INFO:     127.0.0.1:6242 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:9342 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:9341 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:5125 - "GET /api/rooms HTTP/1.1" 200 OK
-INFO:     127.0.0.1:5126 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7227 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7229 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7228 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:4512 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:11079 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:11080 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:3919 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7437 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7436 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:8313 - "POST /api/commands/execute HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:11833 - "POST /api/commands/execute HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:8885 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:13648 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:13647 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:9460 - "POST /api/commands/execute HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:10342 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7125 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7126 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:2008 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:2151 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:2150 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:9408 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:5381 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:5380 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:5860 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:3513 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:3514 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:12058 - "POST /api/commands/execute HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:12203 - "POST /api/commands/execute HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:8611 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:8612 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:8610 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:14513 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:2564 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:2565 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7519 - "POST /api/commands/execute HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:9383 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:1939 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:1940 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:10989 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7255 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7256 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:13424 - "POST /api/commands/execute HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:14576 - "POST /api/commands/execute HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:5808 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:5809 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:5810 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:12402 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:1504 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:1505 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:1506 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:1984 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:1983 - "GET /api/scenes HTTP/1.1" 200 OK
-INFO:     127.0.0.1:2778 - "GET /api/reminders HTTP/1.1" 200 OK
-INFO:     127.0.0.1:5478 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:10343 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:10345 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:10344 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:13051 - "POST /api/commands/execute HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:7406 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7407 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:7408 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:3676 - "POST /api/commands/execute HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:6619 - "POST /api/commands/execute HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:3262 - "POST /api/commands/execute HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:1504 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:1505 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:1506 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:2658 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:2659 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:2660 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:3110 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:3112 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:3111 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:12797 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:10639 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:10640 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:10641 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:1638 - "POST /api/commands/execute HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:7366 - "POST /api/commands/execute HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:14507 - "POST /api/commands/execute HTTP/1.1" 400 Bad Request
-INFO:     127.0.0.1:4615 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:4617 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:4616 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:14560 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:14561 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:14562 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:12302 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:12303 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:12304 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:4401 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:12458 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:12459 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:12905 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:12904 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:12906 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:9752 - "POST /api/commands/execute HTTP/1.1" 200 OK
-INFO:     127.0.0.1:8084 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:8085 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:5765 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:5766 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:5767 - "GET /api/commands/logs HTTP/1.1" 200 OK
- INFO:     127.0.0.1:9277 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:9278 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:9279 - "GET /api/commands/logs HTTP/1.1" 200 OK
- INFO:     127.0.0.1:6768 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:6769 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:6770 - "GET /api/commands/logs HTTP/1.1" 200 OK
-  INFO:     127.0.0.1:4492 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:4493 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:4494 - "GET /api/commands/logs HTTP/1.1" 200 OK
-INFO:     127.0.0.1:6102 - "GET /api/voice/providers HTTP/1.1" 200 OK
-INFO:     127.0.0.1:6101 - "GET /api/devices HTTP/1.1" 200 OK
-INFO:     127.0.0.1:6103 - "GET /api/commands/logs HTTP/1.1" 200 OK
- 
+INFO:     127.0.0.1:9410 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9940 - "GET /api/commands/logs HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:9936 - "GET /api/dashboard HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:9939 - "GET /api/devices HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:9938 - "GET /api/scenes HTTP/1.1" 401 Unauthorized
+INFO:     127.0.0.1:10012 - "POST /api/auth/login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10013 - "GET /api/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10017 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10015 - "GET /api/scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10016 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10014 - "GET /api/weather?city=%E5%8C%97%E4%BA%AC HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3198 - "GET /api/weather?city=%E5%B9%BF%E5%B7%9E HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2355 - "GET /api/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2356 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12393 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12007 - "GET /api/voice/asr-config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12009 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12008 - "GET /api/voice/providers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12010 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10354 - "POST /api/voice/asr-config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9382 - "GET /api/voice/providers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12985 - "POST /api/voice/execute HTTP/1.1" 502 Bad Gateway
+INFO:     127.0.0.1:7639 - "GET /api/voice/providers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9305 - "POST /api/voice/execute HTTP/1.1" 502 Bad Gateway
+INFO:     127.0.0.1:9964 - "GET /api/voice/providers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9965 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9966 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13799 - "GET /api/voice/asr-config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9136 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9135 - "GET /api/scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2732 - "GET /api/reminders HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4689 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13268 - "GET /api/voice/asr-config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9682 - "GET /api/voice/providers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3879 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3878 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4318 - "GET /api/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12988 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12987 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12986 - "GET /api/scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12985 - "GET /api/weather?city=%E5%8C%97%E4%BA%AC HTTP/1.1" 200 OK
+INFO:     127.0.0.1:13063 - "GET /api/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5675 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5674 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5673 - "GET /api/scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5672 - "GET /api/weather?city=%E5%B9%BF%E5%B7%9E HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8888 - "GET /api/weather?city=%E6%9C%AC%E5%9C%B0 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5720 - "GET /api/weather?city=%E5%B9%BF%E5%B7%9E HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5619 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5618 - "GET /api/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9435 - "GET /api/voice/providers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6453 - "GET /api/voice/asr-config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6455 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6454 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12264 - "GET /api/weather?city=%E5%B9%BF%E5%B7%9E HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2931 - "GET /api/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12267 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12266 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:12265 - "GET /api/scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14875 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14874 - "GET /api/scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5922 - "GET /api/weather?city=%E5%B9%BF%E5%B7%9E HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14721 - "GET /api/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5924 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5925 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:5923 - "GET /api/scenes HTTP/1.1" 200 OK
+   INFO:     127.0.0.1:3037 - "GET /api/voice/providers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3038 - "GET /api/voice/asr-config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3039 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3040 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7097 - "GET /api/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4066 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4065 - "GET /api/rooms HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7162 - "GET /api/scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4577 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7163 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:2083 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:7161 - "GET /api/weather?city=%E5%B9%BF%E5%B7%9E HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10925 - "GET /api/weather?city=%E5%B9%BF%E5%B7%9E HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6017 - "GET /api/dashboard HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10928 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10926 - "GET /api/scenes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:10927 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3624 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8230 - "GET /api/voice/providers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:6221 - "GET /api/voice/asr-config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3081 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3082 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3421 - "POST /api/commands/execute HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9199 - "GET /api/commands/logs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:9198 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:3907 - "POST /api/commands/execute HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14219 - "GET /api/devices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14220 - "GET /api/commands/logs HTTP/1.1" 200 OK

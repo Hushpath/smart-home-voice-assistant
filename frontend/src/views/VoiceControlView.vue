@@ -19,7 +19,10 @@
           <p class="panel-kicker">Voice capability</p>
           <h3>语音能力状态</h3>
         </div>
-        <el-button class="refresh-button" :loading="providerLoading" @click="loadVoiceProviders">刷新状态</el-button>
+        <div class="capability-actions">
+          <el-button class="refresh-button" @click="asrConfigDialogVisible = true">配置讯飞</el-button>
+          <el-button class="refresh-button" :loading="providerLoading" @click="loadVoiceProviders">刷新状态</el-button>
+        </div>
       </div>
       <div class="capability-grid">
         <span>
@@ -149,7 +152,19 @@
             <span>{{ lastResult.success ? '控制完成' : '控制失败' }}</span>
             <strong>{{ safe(lastResult.message || summarizeCommandExecution(lastResult.result)) }}</strong>
           </div>
-          <div v-if="lastResult.parsed" class="result-tags">
+          <div v-if="lastResult.isBatch" class="result-tags">
+            <span>批量：{{ lastResult.commandCount }} 条</span>
+            <span>成功：{{ lastResult.successCount }} 条</span>
+            <span>失败：{{ lastResult.failedCount }} 条</span>
+          </div>
+          <div v-if="lastResult.isBatch" class="batch-result-list">
+            <article v-for="item in lastResult.subResults" :key="item.index" :class="{ failed: !item.success }">
+              <span>{{ item.index }}</span>
+              <strong>{{ safe(item.text) }}</strong>
+              <small>{{ item.success ? '成功' : '失败' }} · {{ safe(item.message) }}</small>
+            </article>
+          </div>
+          <div v-else-if="lastResult.parsed" class="result-tags">
             <span>意图：{{ safe(lastResult.parsed.intent) }}</span>
             <span>房间：{{ safe(lastResult.parsed.room) }}</span>
             <span>设备：{{ safe(lastResult.parsed.deviceType || lastResult.parsed.device_type) }}</span>
@@ -225,6 +240,26 @@
         </div>
       </article>
     </section>
+
+    <el-dialog v-model="asrConfigDialogVisible" title="讯飞云端 ASR 配置" width="620px" class="asr-config-dialog">
+      <div class="asr-config-form">
+        <p>配置会保存到后端本地文件，不进入前端代码或浏览器存储。前端仍不会直接调用讯飞。</p>
+        <div v-if="asrConfigStatus.config_file_exists" class="asr-config-status">
+          <span>当前 AppID：{{ safe(asrConfigStatus.app_id_masked) }}</span>
+          <span>当前 APIKey：{{ safe(asrConfigStatus.api_key_masked) }}</span>
+          <span>APISecret：{{ asrConfigStatus.secret_key_configured ? '已配置' : '未配置' }}</span>
+        </div>
+        <el-input v-model="asrConfig.appId" placeholder="讯飞 AppID" />
+        <el-input v-model="asrConfig.apiKey" placeholder="讯飞 APIKey" show-password />
+        <el-input v-model="asrConfig.secretKey" placeholder="讯飞 APISecret" show-password />
+        <p class="mode-help">保存后立即生效；再次保存时可保留密钥字段为空，后端会沿用已有密钥。</p>
+      </div>
+      <template #footer>
+        <el-button @click="asrConfigDialogVisible = false">关闭</el-button>
+        <el-button :loading="asrConfigSaving" @click="clearAsrConfig">清除配置</el-button>
+        <el-button type="primary" :loading="asrConfigSaving" @click="saveAsrConfig">保存到后端</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -234,7 +269,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getCommandLogsApi, executeCommandApi } from '../api/command'
 import { getDevicesApi } from '../api/device'
-import { executeVoiceAudioApi, getVoiceProvidersApi } from '../api/voice'
+import { clearAsrConfigApi, executeVoiceAudioApi, getAsrConfigApi, getVoiceProvidersApi, saveAsrConfigApi } from '../api/voice'
 import {
   cleanText,
   formatDeviceState,
@@ -256,6 +291,8 @@ const providerLoading = ref(false)
 const devicesLoading = ref(false)
 const logsLoading = ref(false)
 const speechEnabled = ref(true)
+const asrConfigDialogVisible = ref(false)
+const asrConfigSaving = ref(false)
 const inputMode = ref('browser')
 const userSelectedInputMode = ref(false)
 const currentInputSource = ref('text')
@@ -279,6 +316,12 @@ const browserTranscript = ref('')
 const browserStopRequested = ref(false)
 const browserStopTimer = ref(null)
 const browserFinalized = ref(false)
+const asrConfig = ref({
+  appId: '',
+  apiKey: '',
+  secretKey: ''
+})
+const asrConfigStatus = ref({})
 
 const exampleGroups = [
   {
@@ -390,6 +433,56 @@ async function loadVoiceProviders() {
     syncPreferredInputMode()
   } finally {
     providerLoading.value = false
+  }
+}
+
+async function loadAsrConfig() {
+  try {
+    const data = await getAsrConfigApi()
+    asrConfigStatus.value = data.config || {}
+  } catch (error) {
+    asrConfigStatus.value = {}
+  }
+}
+
+async function saveAsrConfig() {
+  asrConfigSaving.value = true
+  try {
+    const response = await saveAsrConfigApi(
+      {
+        provider: 'xunfei',
+        app_id: asrConfig.value.appId,
+        api_key: asrConfig.value.apiKey,
+        secret_key: asrConfig.value.secretKey,
+        enable_cloud: true
+      },
+      { rawEnvelope: true, suppressErrorMessage: true }
+    )
+    asrConfigStatus.value = response.data?.config || {}
+    asrConfig.value.apiKey = ''
+    asrConfig.value.secretKey = ''
+    asrConfigDialogVisible.value = false
+    ElMessage.success(response.message || 'ASR 配置已保存')
+    await loadVoiceProviders()
+  } catch (error) {
+    ElMessage.error(error.payload?.message || 'ASR 配置保存失败，请检查必填项。')
+  } finally {
+    asrConfigSaving.value = false
+  }
+}
+
+async function clearAsrConfig() {
+  asrConfigSaving.value = true
+  try {
+    await clearAsrConfigApi({ rawEnvelope: true, suppressErrorMessage: true })
+    asrConfig.value = { appId: '', apiKey: '', secretKey: '' }
+    asrConfigStatus.value = {}
+    ElMessage.success('ASR 本地配置已清除')
+    await loadVoiceProviders()
+  } catch (error) {
+    ElMessage.error(error.payload?.message || 'ASR 配置清除失败')
+  } finally {
+    asrConfigSaving.value = false
   }
 }
 
@@ -514,7 +607,7 @@ async function executeCloudAudio(blob) {
       suppressErrorMessage: true
     })
     lastResult.value = normalizeVoiceExecuteResult(response)
-    finishRun(response.message || lastResult.value.message || '控制完成')
+    finishRun(response.message || lastResult.value.message || '控制完成', lastResult.value.success)
   } catch (error) {
     failRun(friendlyError(error, 'cloud'), 'cloud')
   } finally {
@@ -644,7 +737,7 @@ async function executeTextCommand(command, source) {
       suppressErrorMessage: true
     })
     lastResult.value = normalizeCommandResult(response)
-    finishRun(response.message || lastResult.value.message || '控制完成')
+    finishRun(response.message || lastResult.value.message || '控制完成', lastResult.value.success)
   } catch (error) {
     failRun(friendlyError(error, source), source)
   } finally {
@@ -659,9 +752,13 @@ function startRun(source = 'text') {
   lastResult.value = null
 }
 
-async function finishRun(message) {
+async function finishRun(message, success = true) {
   activeStep.value = 'done'
-  ElMessage.success(message)
+  if (success) {
+    ElMessage.success(message)
+  } else {
+    ElMessage.warning(message)
+  }
   speak(message)
   await Promise.all([loadDevices(), loadLogs()])
 }
@@ -846,6 +943,7 @@ function nextFrame() {
 
 onMounted(() => {
   loadVoiceProviders()
+  loadAsrConfig()
   loadDevices()
   loadLogs()
 })

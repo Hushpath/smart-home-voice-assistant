@@ -1,13 +1,12 @@
 
 > smart-home-voice-frontend@0.1.0 dev
-> vite --host 127.0.0.1
+> vite --host 127.0.0.1 --host 127.0.0.1
 
 
-  [32m[1mVITE[22m v7.3.5[39m  [2mready in [0m[1m329[22m[2m[0m ms[22m
+  [32m[1mVITE[22m v7.3.5[39m  [2mready in [0m[1m341[22m[2m[0m ms[22m
 
   [32m➜[39m  [1mLocal[22m:   [36mhttp://127.0.0.1:[1m5173[22m/[39m
 [2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
-[2m00:34:35[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/DevicesView.vue, /src/views/DashboardView.vue, /src/views/LogsView.vue, /src/views/RemindersView.vue, /src/views/ScenesView.vue, /src/views/VoiceControlView.vue, /src/components/LogDetailDrawer.vue[22m
-[2m00:36:34[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/VoiceControlView.vue[22m
-[2m00:46:33[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/VoiceControlView.vue[22m
-[2m00:47:29[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/VoiceControlView.vue[22m
+[2m23:27:07[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/VoiceControlView.vue[22m
+[2m23:29:32[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/views/DashboardView.vue[22m
+[2m23:29:52[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/styles/main.css[22m

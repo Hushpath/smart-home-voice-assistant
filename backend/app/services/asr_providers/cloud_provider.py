@@ -14,6 +14,7 @@ from typing import Any
 import httpx
 
 from app.services.asr_providers.base import ASRProvider, ASRProviderError, ASRRecognitionResult
+from app.services.asr_config_store import DEFAULT_XUNFEI_BASE_URL, load_asr_file_config
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -35,23 +36,26 @@ class CloudASRConfig:
 
     @classmethod
     def from_env(cls) -> "CloudASRConfig":
+        file_config = load_asr_file_config()
         raw_timeout = os.getenv("ASR_TIMEOUT_SECONDS", "10").strip()
+        if file_config.get("timeout_seconds") is not None:
+            raw_timeout = str(file_config.get("timeout_seconds"))
         try:
             timeout_seconds = max(1.0, float(raw_timeout))
         except ValueError:
             timeout_seconds = 10.0
-        provider = os.getenv("ASR_PROVIDER", "cloud").strip().lower() or "cloud"
-        base_url = os.getenv("ASR_BASE_URL", "").strip()
+        provider = str(file_config.get("provider") or os.getenv("ASR_PROVIDER", "cloud")).strip().lower() or "cloud"
+        base_url = str(file_config.get("base_url") or os.getenv("ASR_BASE_URL", "")).strip()
         if provider in {"xunfei", "iflytek"} and not base_url:
-            base_url = "wss://iat-api.xfyun.cn/v2/iat"
+            base_url = DEFAULT_XUNFEI_BASE_URL
         return cls(
             provider=provider,
             base_url=base_url,
-            api_key=os.getenv("ASR_API_KEY", "").strip(),
-            secret_key=os.getenv("ASR_SECRET_KEY", "").strip(),
-            app_id=os.getenv("ASR_APP_ID", "").strip(),
+            api_key=str(file_config.get("api_key") or os.getenv("ASR_API_KEY", "")).strip(),
+            secret_key=str(file_config.get("secret_key") or os.getenv("ASR_SECRET_KEY", "")).strip(),
+            app_id=str(file_config.get("app_id") or os.getenv("ASR_APP_ID", "")).strip(),
             timeout_seconds=timeout_seconds,
-            enable_cloud=_env_bool("ASR_ENABLE_CLOUD", False),
+            enable_cloud=bool(file_config.get("enable_cloud")) if "enable_cloud" in file_config else _env_bool("ASR_ENABLE_CLOUD", False),
         )
 
     @property

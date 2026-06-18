@@ -45,6 +45,7 @@
               filterable
               allow-create
               default-first-option
+              popper-class="weather-city-popper"
               :reserve-keyword="false"
               :loading="weatherLoading"
               @change="loadWeather"
@@ -155,7 +156,7 @@ const weather = reactive(normalizeWeather())
 const scenes = ref([])
 const recentLogs = ref([])
 const devices = ref([])
-const selectedWeatherCity = ref('北京')
+const selectedWeatherCity = ref('广州')
 const weatherLoading = ref(false)
 const weatherCityOptions = ['北京', '上海', '广州', '深圳', '杭州', '南京', '成都', '重庆', '西安', '武汉', '本地']
 

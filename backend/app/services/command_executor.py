@@ -17,6 +17,7 @@ from app.services.home_actions import (
     run_scene_actions,
     validate_value_range,
 )
+from app.services.multi_command_parser import MultiCommandParser, MultiCommandParseResult
 
 
 class CommandExecutor:
@@ -24,10 +25,15 @@ class CommandExecutor:
         self.db = db
         self.user = user
         self.parser = CommandParser()
+        self.multi_parser = MultiCommandParser(parser=self.parser)
 
     def execute(self, command: str | None, context: dict[str, Any] | None = None) -> dict[str, Any]:
         started_at = time.perf_counter()
         dialect = (context or {}).get("dialect") or "auto"
+        multi_parsed = self.multi_parser.parse(command, dialect=dialect)
+        if multi_parsed.is_batch:
+            return self._execute_batch(command, multi_parsed, context, started_at)
+
         parsed, normalization = normalize_and_parse_command(command, parser=self.parser, dialect=dialect)
         enriched_context = self._merge_normalization_context(context, normalization.to_dict())
         if not parsed.valid:
@@ -73,6 +79,64 @@ class CommandExecutor:
         )
         self.db.commit()
         return self._build_execute_response(parsed, result, enriched_context)
+
+    def _execute_batch(
+        self,
+        command: str | None,
+        multi_parsed: MultiCommandParseResult,
+        context: dict[str, Any] | None,
+        started_at: float,
+    ) -> dict[str, Any]:
+        enriched_context = self._merge_normalization_context(context, multi_parsed.normalization)
+        enriched_context["batch"] = {
+            "is_batch": True,
+            "command_count": multi_parsed.command_count,
+            "split_detail": multi_parsed.split_detail,
+        }
+
+        sub_results: list[dict[str, Any]] = []
+        success_count = 0
+        failed_count = 0
+        for item in multi_parsed.sub_commands:
+            parsed = item.parsed
+            if not parsed.valid:
+                failed_count += 1
+                sub_results.append(self._build_failed_sub_result(item.index, item.text, parsed.error_code, parsed.message, parsed))
+                continue
+            try:
+                execution_result = self._execute_parsed(parsed)
+                success_count += 1
+                sub_results.append(self._build_success_sub_result(item.index, item.text, parsed, execution_result))
+            except BusinessError as exc:
+                failed_count += 1
+                sub_results.append(self._build_failed_sub_result(item.index, item.text, exc.code, exc.message, parsed, exc.data))
+
+        if failed_count == 0:
+            code = "OK"
+        elif success_count > 0:
+            code = "PARTIAL_SUCCESS"
+        else:
+            code = "BATCH_FAILED"
+        message = f"已执行 {multi_parsed.command_count} 条指令，成功 {success_count} 条，失败 {failed_count} 条"
+        success = failed_count == 0
+        latency_ms = self._elapsed_ms(started_at)
+
+        response = {
+            "is_batch": True,
+            "code": code,
+            "message": message,
+            "command_count": multi_parsed.command_count,
+            "success_count": success_count,
+            "failed_count": failed_count,
+            "sub_commands": [item.to_dict() for item in multi_parsed.sub_commands],
+            "sub_results": sub_results,
+            "trace_id": enriched_context.get("trace_id"),
+            "context": enriched_context,
+            "normalization": enriched_context.get("normalization"),
+        }
+        self._write_batch_log(command, multi_parsed, response, success, None if success else message, enriched_context, latency_ms)
+        self.db.commit()
+        return response
 
     def _execute_parsed(self, parsed: ParseResult) -> dict[str, Any]:
         if parsed.intent == "turn_on":
@@ -260,6 +324,52 @@ class CommandExecutor:
         if not success:
             self.db.commit()
 
+    def _write_batch_log(
+        self,
+        command: str | None,
+        multi_parsed: MultiCommandParseResult,
+        execution_result: dict[str, Any],
+        success: bool,
+        error_message: str | None,
+        context: dict[str, Any],
+        execution_latency_ms: int,
+    ) -> None:
+        parsed_result = {
+            "intent": "batch",
+            "valid": multi_parsed.valid,
+            "is_batch": True,
+            "command_count": multi_parsed.command_count,
+            "original_text": multi_parsed.original_text,
+            "normalized_text": multi_parsed.normalized_text,
+            "confidence": self._batch_confidence(multi_parsed),
+            "message": execution_result["message"],
+            "sub_commands": [item.to_dict() for item in multi_parsed.sub_commands],
+            "parse_detail": {
+                "dialect_normalization": multi_parsed.normalization,
+                "batch_split": multi_parsed.split_detail,
+                "sub_commands": [item.to_dict() for item in multi_parsed.sub_commands],
+            },
+            "context": context,
+        }
+        log_execution_result = {
+            **execution_result,
+            "success": success,
+            "error_code": None if success else execution_result["code"],
+            "error_message": error_message,
+            "execution_latency_ms": execution_latency_ms,
+            "context": context,
+        }
+        self.db.add(
+            CommandLog(
+                user_id=self.user.id,
+                raw_command=command or "",
+                parsed_result=parsed_result,
+                execution_result=log_execution_result,
+                success=success,
+                error_message=error_message,
+            )
+        )
+
     def _merge_normalization_context(
         self,
         context: dict[str, Any] | None,
@@ -273,6 +383,58 @@ class CommandExecutor:
 
     def _elapsed_ms(self, started_at: float) -> int:
         return int((time.perf_counter() - started_at) * 1000)
+
+    def _build_success_sub_result(
+        self,
+        index: int,
+        text: str,
+        parsed: ParseResult,
+        result: dict[str, Any],
+    ) -> dict[str, Any]:
+        response = self._build_execute_response(parsed, result)
+        return {
+            "index": index,
+            "text": text,
+            "success": True,
+            "code": "OK",
+            "message": "指令执行成功",
+            "parsed": response["parsed"],
+            "result": response["result"],
+            "device_before": response.get("device_before"),
+            "device_after": response.get("device_after"),
+            "affected_devices": response.get("affected_devices") or [],
+            "reminder": response.get("reminder"),
+            "weather": response.get("weather"),
+            "scene": response.get("scene"),
+        }
+
+    def _build_failed_sub_result(
+        self,
+        index: int,
+        text: str,
+        code: str,
+        message: str,
+        parsed: ParseResult,
+        data: Any = None,
+    ) -> dict[str, Any]:
+        return {
+            "index": index,
+            "text": text,
+            "success": False,
+            "code": code,
+            "message": message,
+            "parsed": parsed.to_dict(),
+            "result": data,
+            "device_before": None,
+            "device_after": None,
+            "affected_devices": [],
+        }
+
+    def _batch_confidence(self, multi_parsed: MultiCommandParseResult) -> float | None:
+        confidences = [item.parsed.confidence for item in multi_parsed.sub_commands if item.parsed.confidence is not None]
+        if not confidences:
+            return None
+        return round(min(confidences), 2)
 
 
 def generate_command_trace_id() -> str:

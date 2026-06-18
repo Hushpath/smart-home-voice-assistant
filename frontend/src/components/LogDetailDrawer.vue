@@ -73,6 +73,18 @@
         <JsonBlock title="intent_scores" :value="parse.intent_scores" />
       </section>
 
+      <section v-if="batch.is_batch" class="log-detail-section">
+        <div class="section-title"><span>批量执行信息</span></div>
+        <div class="detail-kv-grid">
+          <div><label>command_count</label><strong>{{ value(batch.command_count) }}</strong></div>
+          <div><label>success_count</label><strong>{{ value(batch.success_count) }}</strong></div>
+          <div><label>failed_count</label><strong>{{ value(batch.failed_count) }}</strong></div>
+          <div><label>split_strategy</label><strong>{{ value(batch.split_detail?.strategy) }}</strong></div>
+        </div>
+        <JsonBlock title="sub_commands" :value="batch.sub_commands" />
+        <JsonBlock title="sub_results" :value="batch.sub_results" />
+      </section>
+
       <section class="log-detail-section">
         <div class="section-title"><span>执行信息</span></div>
         <div class="detail-kv-grid">
@@ -116,6 +128,7 @@ const asr = computed(() => props.log?.detail?.asr || {})
 const normalization = computed(() => props.log?.detail?.normalization || {})
 const parse = computed(() => props.log?.detail?.parse || {})
 const execution = computed(() => props.log?.detail?.execution || {})
+const batch = computed(() => props.log?.detail?.batch || {})
 const JsonBlock = {
   props: {
     title: {

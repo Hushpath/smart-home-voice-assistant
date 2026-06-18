@@ -9,11 +9,13 @@ from app.services.command_executor import CommandExecutor
 from app.services.command_parser import CommandParser
 from app.services.dialect_normalizer import normalize_and_parse_command
 from app.services.home_actions import BusinessError
+from app.services.multi_command_parser import MultiCommandParser
 from app.utils.response import error_response, success_response
 
 
 router = APIRouter(prefix="/commands", tags=["中文指令"])
 parser = CommandParser()
+multi_parser = MultiCommandParser(parser=parser)
 DEVICE_TYPE_LABELS = {
     "light": "灯",
     "air_conditioner": "空调",
@@ -28,6 +30,10 @@ def parse_command(
     payload: CommandParseRequest,
     current_user: User = Depends(get_current_user),
 ):
+    batch_result = multi_parser.parse(payload.command, dialect="auto")
+    if batch_result.is_batch:
+        return success_response(data=batch_result.to_dict(), message="解析成功")
+
     result, normalization = normalize_and_parse_command(payload.command, parser=parser, dialect="auto")
     if not result.valid:
         raise HTTPException(
@@ -52,6 +58,7 @@ def serialize_command_log(log: CommandLog) -> dict:
     command_text = parsed_result.get("original_text") or log.raw_command
     intent = parsed_result.get("intent")
     device_type = parsed_result.get("device_type")
+    is_batch = bool(parsed_result.get("is_batch") or execution_result.get("is_batch"))
 
     return {
         "id": log.id,
@@ -60,7 +67,7 @@ def serialize_command_log(log: CommandLog) -> dict:
         "command_text": command_text,
         "input_source": context.get("input_source", "text"),
         "asr_provider": context.get("asr_provider"),
-        "intent": intent,
+        "intent": "batch" if is_batch else intent,
         "room": parsed_result.get("room"),
         "device_type": DEVICE_TYPE_LABELS.get(device_type, device_type),
         "confidence": confidence,
@@ -76,6 +83,7 @@ def serialize_command_log(log: CommandLog) -> dict:
             "normalization": normalization,
             "parse": _build_parse_detail(parsed_result, parse_detail),
             "execution": execution_detail,
+            "batch": _build_batch_detail(parsed_result, execution_result),
             "raw": {
                 "parsed_result": parsed_result,
                 "execution_result": execution_result,
@@ -131,6 +139,9 @@ def _build_parse_detail(parsed_result: dict, parse_detail: dict) -> dict:
         "matched_keywords": parsed_result.get("matched_keywords") or [],
         "match_type": parsed_result.get("match_type"),
         "message": parsed_result.get("message"),
+        "is_batch": parsed_result.get("is_batch", False),
+        "command_count": parsed_result.get("command_count"),
+        "sub_commands": parsed_result.get("sub_commands") or parse_detail.get("sub_commands") or [],
     }
 
 
@@ -152,6 +163,22 @@ def _build_execution_detail(log: CommandLog, execution_result: dict) -> dict:
         "error_code": result.get("error_code"),
         "error_message": result.get("error_message") or log.error_message,
         "execution_latency_ms": result.get("execution_latency_ms"),
+        "is_batch": result.get("is_batch", False),
+        "success_count": result.get("success_count"),
+        "failed_count": result.get("failed_count"),
+        "sub_results": result.get("sub_results") or [],
+    }
+
+
+def _build_batch_detail(parsed_result: dict, execution_result: dict) -> dict:
+    return {
+        "is_batch": bool(parsed_result.get("is_batch") or execution_result.get("is_batch")),
+        "command_count": parsed_result.get("command_count") or execution_result.get("command_count"),
+        "success_count": execution_result.get("success_count"),
+        "failed_count": execution_result.get("failed_count"),
+        "split_detail": (parsed_result.get("parse_detail") or {}).get("batch_split"),
+        "sub_commands": parsed_result.get("sub_commands") or [],
+        "sub_results": execution_result.get("sub_results") or [],
     }
 
 
@@ -169,6 +196,10 @@ def execute_command(
             status_code=exc.status_code,
             detail=error_response(exc.code, exc.message, exc.data),
         ) from exc
+    if result.get("is_batch"):
+        if result.get("code") == "OK":
+            return success_response(data=result, message=result.get("message", "批量指令执行成功"))
+        return error_response(result.get("code", "PARTIAL_SUCCESS"), result.get("message", "批量指令部分成功"), result)
     return success_response(data=result, message="指令执行成功")
 
 

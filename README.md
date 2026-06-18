@@ -24,6 +24,7 @@
 - 可插拔 ASR Provider：当前提供云端 Provider 框架和测试用 Mock Provider。
 - 方言/口音容错层：重点增强粤语，轻量支持西南、东北/北方口语。
 - 鲁棒中文指令解析与执行，支持设备控制、状态查询、场景执行、提醒创建和天气查询。
+- 多指令解析与批量执行，支持一句话中包含多个设备控制、场景、提醒或天气指令。
 - 操作日志记录 trace_id、ASR、方言归一、解析和执行全过程。
 - 提醒事项创建、查询、修改和删除。
 - 场景模式执行，当前包含回家模式、睡眠模式和离家模式。
@@ -78,6 +79,7 @@ software/
 │   │   │   ├── command_executor.py
 │   │   │   ├── command_parser.py
 │   │   │   ├── dialect_normalizer.py
+│   │   │   ├── multi_command_parser.py
 │   │   │   └── speech_recognition_service.py
 │   │   ├── utils/
 │   │   └── main.py
@@ -187,6 +189,8 @@ ASR_ENABLE_CLOUD=true
 讯飞语音听写不支持浏览器默认 `audio/webm` 直接上传。当前后端只接受 `audio/wav` 或 `audio/mpeg` 走讯飞；前端在讯飞模式下会使用 Web Audio 采集语音并编码为 wav 上传。项目不会引入 ffmpeg、pydub 等大型转码依赖。
 
 云端未配置时，`/api/voice/execute` 返回 `ASR_PROVIDER_NOT_CONFIGURED`，前端提示使用浏览器识别或文本输入兜底。
+
+语音控制页提供“配置讯飞”窗口，只填写 AppID、APIKey、APISecret 三个必要配置，并调用后端保存到 `backend/data/asr_config.json`。配置保存后立即生效，不需要重启后端；前端不会保存密钥，也不会直连讯飞。读取配置状态时只返回脱敏信息。
 
 常见错误码：
 
@@ -345,6 +349,16 @@ ASR 常见错词示例：
 - 提醒我晚上八点吃药
 - 查询北京天气
 
+多指令示例：
+
+- 打开客厅灯和空调
+- 打开客厅灯、空调和电视
+- 打开客厅和卧室的灯
+- 打开客厅灯并把卧室空调调到26度
+- 打开卧室空调并调到26度
+- 开启睡眠模式并提醒我晚上八点吃药
+- 将客厅灯亮度调到80并把电视音量调到30
+
 粤语/方言演示指令：
 
 - 帮我打开客厅冷气
@@ -359,6 +373,21 @@ ASR 常见错词示例：
 - 客厅灯开开
 - 打开客厅等
 - 卧室空条调到二十六度
+
+## 多指令解析与批量执行
+
+`MultiCommandParser` 位于 `DialectNormalizer` 和 `CommandParser` 之间，用于把一句话拆成多条仍可由现有单条 parser 识别的子指令。已有单条指令不进入批量执行路径。
+
+当前支持：
+
+- 同一动作 + 同一房间 + 多设备：`打开客厅灯和空调` -> `打开客厅灯`、`打开客厅空调`。
+- 同一动作 + 多房间 + 同一设备：`打开客厅和卧室的灯` -> `打开客厅灯`、`打开卧室灯`。
+- 多个完整独立指令：`打开客厅灯并把卧室空调调到26度`。
+- 上下文继承：`打开卧室空调并调到26度` 中第二条会继承“卧室空调”。
+- 短句继承和对象前置：`打开客厅灯并空调`、`客厅灯和空调都打开`。
+- 混合业务指令：场景、提醒、天气和设备控制可在同一句中组合。
+
+`/api/commands/parse` 识别批量指令时返回 `is_batch=true`、`command_count` 和 `sub_commands`。`/api/commands/execute` 批量执行时逐条执行，返回 `success_count`、`failed_count` 和 `sub_results`；部分成功返回 `PARTIAL_SUCCESS`，不会回滚已经成功的子指令。批量中的状态改变类子指令如果缺少房间或设备，且无法从上下文继承，会标记 `AMBIGUOUS_SUB_COMMAND` 并跳过，避免误执行。语音执行路径 `/api/voice/execute` 复用同一批量执行能力。
 
 ## 操作日志与 trace_id
 
@@ -375,6 +404,7 @@ voice_YYYYMMDD_HHMMSS_random
 - 方言归一：detected_dialect、normalized_text、dialect_matches、asr_corrections、number_conversions、removed_fillers
 - 指令解析：intent、room、device_type、value、scene、reminder、city、intent_scores、matched_keywords、match_type
 - 执行结果：success、code、message、device_before、device_after、affected_devices、execution_latency_ms
+- 批量链路：is_batch、command_count、sub_commands、sub_results、success_count、failed_count
 
 `CommandExecutor` 是主要日志写入入口，避免一次执行重复写入多条 `command_logs`。
 
@@ -467,6 +497,7 @@ npm run build
 - 云端 ASR 需要 API Key 和网络；当前已适配讯飞语音听写，其他厂商仍需按官方文档扩展。
 - 未配置云端 ASR 时，应使用浏览器识别或文本输入兜底。
 - 方言支持是有限场景下的指令容错，不是完整方言自然对话。
+- 多指令拆分是规则式能力，适合常见连接词、对象前置和共享上下文，并包含基础歧义保护；不覆盖任意复杂自然语言并列结构。
 - 粤语是重点增强，但不是完整粤语对话系统。
 - 系统使用 SQLite 中的虚拟设备，不接入真实智能家居硬件。
 - 低置信度二次确认机制暂未实现。

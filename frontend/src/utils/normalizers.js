@@ -51,6 +51,7 @@ export function normalizeCommandLog(log = {}) {
   const parsedResult = normalizeParsedCommand(log.parsed_result || {})
   const detail = normalizeLogDetail(log.detail || {}, parsedResult, log.execution_result || null)
   const confidence = typeof log.confidence === 'number' ? log.confidence : parsedResult.confidence
+  const isBatch = Boolean(detail.batch?.is_batch || parsedResult.is_batch || log.execution_result?.is_batch)
   return {
     id: log.id,
     userId: log.user_id,
@@ -68,6 +69,8 @@ export function normalizeCommandLog(log = {}) {
     parsedResult,
     executionResult: log.execution_result || null,
     success: Boolean(log.success),
+    isBatch,
+    commandCount: detail.batch?.command_count || parsedResult.command_count || log.execution_result?.command_count || null,
     message: cleanText(log.message || detail.execution.message),
     errorMessage: log.error_message || '',
     createdAt: log.created_at || null,
@@ -98,6 +101,14 @@ export function normalizeLogDetail(detail = {}, parsedResult = {}, executionResu
       message: parsedResult.message
     },
     execution,
+    batch: detail.batch || {
+      is_batch: Boolean(parsedResult.is_batch || execution?.is_batch),
+      command_count: parsedResult.command_count || execution?.command_count,
+      success_count: execution?.success_count,
+      failed_count: execution?.failed_count,
+      sub_commands: parsedResult.sub_commands || [],
+      sub_results: execution?.sub_results || []
+    },
     raw: detail.raw || {
       parsed_result: parsedResult,
       execution_result: executionResult
@@ -136,11 +147,18 @@ export function normalizeScene(scene = {}) {
 
 export function normalizeCommandResult(result = {}) {
   const data = result.data || result
+  const isBatch = Boolean(data.is_batch)
   return {
     success: result.success,
-    code: result.code,
-    message: result.message,
+    code: data.code || result.code,
+    message: data.message || result.message,
     traceId: data.trace_id || null,
+    isBatch,
+    commandCount: data.command_count || 0,
+    successCount: data.success_count || 0,
+    failedCount: data.failed_count || 0,
+    subCommands: data.sub_commands || [],
+    subResults: normalizeSubResults(data.sub_results || []),
     parsed: data.parsed ? normalizeParsedCommand(data.parsed) : null,
     result: data.result || null,
     deviceBefore: data.device_before || data.result?.before_state || null,
@@ -150,6 +168,25 @@ export function normalizeCommandResult(result = {}) {
     weather: data.weather || data.result?.weather || null,
     scene: data.scene || data.result?.scene || null
   }
+}
+
+export function normalizeSubResults(items = []) {
+  if (!Array.isArray(items)) return []
+  return items.map((item) => ({
+    ...item,
+    index: item.index,
+    text: cleanText(item.text),
+    success: Boolean(item.success),
+    code: cleanText(item.code),
+    message: cleanText(item.message),
+    parsed: item.parsed ? normalizeParsedCommand(item.parsed) : null,
+    affectedDevices: item.affected_devices || [],
+    deviceBefore: item.device_before || null,
+    deviceAfter: item.device_after || null,
+    reminder: item.reminder || item.result?.reminder || null,
+    weather: item.weather || item.result?.weather || null,
+    scene: item.scene || item.result?.scene || null
+  }))
 }
 
 export function normalizeVoiceExecuteResult(result = {}) {
@@ -299,6 +336,9 @@ export function formatDateTime(value) {
 export function summarizeCommandExecution(executionResult = {}) {
   if (!executionResult || typeof executionResult !== 'object') return '无执行结果'
   const data = executionResult.data || executionResult
+  if (data.is_batch) {
+    return `批量执行：成功 ${data.success_count ?? 0} 条，失败 ${data.failed_count ?? 0} 条`
+  }
   const result = data.result || data
 
   if (result.device) {

@@ -579,6 +579,79 @@ input {
   color: var(--text-muted);
 }
 
+.weather-city-select {
+  width: 132px;
+  flex: 0 0 auto;
+}
+
+.weather-city-select .el-select__wrapper {
+  min-height: 38px;
+  border: 1px solid rgba(84, 216, 255, 0.28);
+  border-radius: 14px;
+  padding: 0 12px;
+  color: var(--text-main);
+  background:
+    linear-gradient(145deg, rgba(13, 31, 53, 0.92), rgba(7, 22, 39, 0.78)),
+    rgba(84, 216, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), 0 10px 24px rgba(0, 0, 0, 0.18);
+}
+
+.weather-city-select .el-select__wrapper.is-focused {
+  border-color: rgba(84, 216, 255, 0.58);
+  box-shadow: 0 0 0 3px rgba(84, 216, 255, 0.12), 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
+.weather-city-select .el-select__selected-item,
+.weather-city-select .el-select__placeholder,
+.weather-city-select .el-select__input {
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.weather-city-select .el-select__caret {
+  color: var(--accent-cyan);
+}
+
+.weather-city-popper.el-popper {
+  overflow: hidden;
+  border: 1px solid rgba(84, 216, 255, 0.24);
+  border-radius: 14px;
+  background: rgba(7, 22, 39, 0.98);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.35);
+}
+
+.weather-city-popper .el-popper__arrow::before {
+  border-color: rgba(84, 216, 255, 0.24);
+  background: rgba(7, 22, 39, 0.98);
+}
+
+.weather-city-popper .el-select-dropdown {
+  background: transparent;
+}
+
+.weather-city-popper .el-select-dropdown__list {
+  padding: 6px;
+}
+
+.weather-city-popper .el-select-dropdown__item {
+  height: 34px;
+  border-radius: 10px;
+  padding: 0 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.weather-city-popper .el-select-dropdown__item.hover,
+.weather-city-popper .el-select-dropdown__item:hover {
+  color: var(--text-main);
+  background: rgba(84, 216, 255, 0.12);
+}
+
+.weather-city-popper .el-select-dropdown__item.selected {
+  color: var(--accent-cyan);
+  background: rgba(84, 216, 255, 0.16);
+}
+
 .command-chip-list,
 .scene-chip-list {
   display: flex;
@@ -2728,11 +2801,6 @@ body,
   gap: 8px;
 }
 
-.weather-city-select {
-  width: 84px;
-  flex: 0 0 auto;
-}
-
 .weather-card .weather-source-note {
   display: block;
   margin-top: 7px;
@@ -3140,6 +3208,101 @@ pre {
 .text-submit-row span {
   color: var(--text-muted);
   font-size: 11px;
+}
+
+.capability-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.batch-result-list {
+  display: grid;
+  gap: 8px;
+}
+
+.batch-result-list article {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 4px 10px;
+  align-items: center;
+  border: 1px solid rgba(109, 242, 193, 0.16);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(3, 11, 22, 0.24);
+}
+
+.batch-result-list article.failed {
+  border-color: rgba(255, 107, 125, 0.28);
+}
+
+.batch-result-list span {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--bg);
+  background: var(--accent-mint);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.batch-result-list article.failed span {
+  background: var(--danger);
+}
+
+.batch-result-list strong,
+.batch-result-list small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.batch-result-list strong {
+  color: var(--text-main);
+  font-size: 13px;
+}
+
+.batch-result-list small {
+  grid-column: 2;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.asr-config-form {
+  display: grid;
+  gap: 12px;
+}
+
+.asr-config-form p {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.asr-config-status {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(109, 242, 193, 0.18);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(109, 242, 193, 0.06);
+}
+
+.asr-config-status span {
+  color: var(--text-main);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.asr-config-form pre {
+  margin: 0;
+  max-height: 260px;
+  border: 1px solid rgba(84, 216, 255, 0.14);
+  background: rgba(3, 11, 22, 0.74);
+  color: var(--accent-mint);
+  white-space: pre-wrap;
 }
 
 @media (max-width: 760px) {

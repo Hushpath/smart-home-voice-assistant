@@ -10,7 +10,8 @@ from app.services import home_actions
 
 
 @pytest.fixture(autouse=True)
-def disable_real_weather_requests(monkeypatch):
+def disable_real_weather_requests(monkeypatch, tmp_path):
+    monkeypatch.setenv("ASR_CONFIG_PATH", str(tmp_path / "asr_config.json"))
     home_actions.clear_weather_cache()
 
     def offline_weather(city_name):

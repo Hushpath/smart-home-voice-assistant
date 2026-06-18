@@ -12,7 +12,7 @@
 - Web Speech API 识别文本后调用 `POST /api/commands/execute`。
 - 文本输入直接调用 `POST /api/commands/execute`。
 
-前端不做方言归一、指令解析或云端 ASR 厂商调用。
+前端不做方言归一、多指令拆分、指令解析或云端 ASR 厂商调用。
 
 ## 优先查看
 
@@ -40,17 +40,18 @@
 ## 语音页要求
 
 - 不让前端直连云端 ASR。
-- 不保存或硬编码 ASR API Key、Secret、App ID。
+- 不在前端保存或硬编码 ASR API Key、Secret、App ID；配置窗口只能提交给后端保存。
 - 不把云端 ASR 作为唯一入口；未配置时提示使用浏览器识别或文本输入。
 - 不让用户在主界面手动选择方言。
 - 主流程展示“听取指令、理解语音、执行控制、完成反馈”。
 - 主界面只展示执行摘要；transcript、normalized_text、dialect_matches、intent_scores、raw JSON 放到日志详情。
+- 批量执行结果只展示总体成功/失败和子指令简短结果。
 - 保留 Speech Synthesis 播报开关。
 
 ## 日志页要求
 
 - 日志列表展示摘要。
-- 日志详情分块展示链路概览、语音识别、方言容错、指令解析、执行信息和原始 JSON。
+- 日志详情分块展示链路概览、语音识别、方言容错、指令解析、批量执行、执行信息和原始 JSON。
 - 字段缺失时显示 `-`。
 
 ## 常用命令

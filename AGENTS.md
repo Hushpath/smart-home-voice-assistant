@@ -17,6 +17,7 @@
 前端录音 / 浏览器语音识别 / 文本输入
 → 后端 ASR Provider
 → DialectNormalizer
+→ MultiCommandParser
 → CommandParser
 → CommandExecutor
 → command_logs / device_status_history
@@ -35,6 +36,7 @@
 - 不训练语音识别模型，不接入真实智能家居硬件。
 - 不为日志功能大规模修改数据库结构。
 - 一次指令执行不要重复写入多条 `command_logs`。
+- 多指令拆分、批量执行和部分成功处理必须在后端完成。
 
 ## 事实来源
 

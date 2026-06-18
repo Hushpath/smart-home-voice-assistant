@@ -11,6 +11,7 @@
 ```text
 云端 ASR 音频 / 浏览器识别文本 / 文本输入
 → DialectNormalizer
+→ MultiCommandParser
 → CommandParser
 → CommandExecutor
 ```
@@ -40,7 +41,7 @@
 ## 语音与 ASR
 
 - 前端不能直连云端 ASR。
-- API Key、Secret、App ID 只能来自环境变量或 `.env`。
+- API Key、Secret、App ID 只能来自环境变量、`.env` 加载结果或后端本地配置文件 `backend/data/asr_config.json`。
 - 没有明确厂商官方文档时，只保留 Provider 抽象、配置校验、HTTP 框架、错误处理和扩展点。
 - 云端 ASR 未配置时返回 `ASR_PROVIDER_NOT_CONFIGURED` 和 fallback 建议，不在后端静默回退浏览器识别。
 - `MockASRProvider` 只能用于 pytest、smoke test 或本地开发测试。
@@ -51,6 +52,7 @@
 - 方言容错位于 `app/services/dialect_normalizer.py`，不直接决定业务执行。
 - 方言词典替换必须最长匹配优先。
 - `/api/commands/parse` 和 `/api/commands/execute` 请求体 `{ "command": "..." }` 保持兼容。
+- 多指令解析和批量执行在后端完成，单条指令响应结构保持兼容。
 - 温度范围保持 `16-30`，亮度和音量范围保持 `0-100`；越界不得执行设备状态修改。
 - 低置信度设备控制类指令不得强行执行。
 - `CommandExecutor` 优先作为唯一日志写入入口，通过 context 记录 trace_id、ASR、normalization、parse 和 execution 信息。
