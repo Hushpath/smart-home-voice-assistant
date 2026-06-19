@@ -20,6 +20,7 @@
         </div>
         <div class="capability-actions">
           <el-button class="refresh-button" @click="asrConfigDialogVisible = true">配置讯飞</el-button>
+          <el-button class="refresh-button" @click="personalizationDialogVisible = true">个性化设置</el-button>
           <el-button class="refresh-button" :loading="providerLoading" @click="loadVoiceProviders">刷新状态</el-button>
         </div>
       </div>
@@ -125,11 +126,18 @@
         </div>
 
         <div class="example-groups">
-          <div v-for="group in exampleGroups" :key="group.title" class="example-group">
-            <label>{{ group.title }}</label>
-            <div class="command-chip-list">
-              <button v-for="item in group.items" :key="item" :disabled="busy || recording" @click="runExample(item)">
-                {{ item }}
+          <div class="example-group">
+            <label>你的常用指令</label>
+            <el-empty v-if="!frequentCommandsLoading && !frequentCommands.length" description="暂无常用指令" :image-size="48" />
+            <div v-else class="frequent-command-list" v-loading="frequentCommandsLoading">
+              <button
+                v-for="item in frequentCommands"
+                :key="`${item.command}-${item.count}`"
+                :disabled="busy || recording"
+                @click="runFrequentCommand(item.command)"
+              >
+                <strong>{{ item.command }}</strong>
+                <small>{{ item.count }} 次 · {{ formatDateTime(item.lastUsedAt) }}</small>
               </button>
             </div>
           </div>
@@ -202,7 +210,24 @@
             <span>待命</span>
             <strong>等待家居指令</strong>
           </div>
-          <p>可以使用云端录音、浏览器识别或文本输入。点击推荐指令会直接走文本执行兜底。</p>
+          <p>可以使用云端录音、浏览器识别或文本输入，执行细节会记录到操作日志。</p>
+        </article>
+
+        <article class="voice-monitor-card recent-log-embed">
+          <div class="section-head">
+            <div>
+              <p class="panel-kicker">Recent logs</p>
+              <h3>最近执行记录</h3>
+            </div>
+            <el-button class="refresh-button" :loading="logsLoading" @click="loadLogs">刷新</el-button>
+          </div>
+          <div class="recent-log-list compact">
+            <article v-for="log in recentLogs" :key="log.id">
+              <span :class="{ failed: !log.success }">{{ log.success ? '成功' : '失败' }}</span>
+              <strong>{{ log.commandText || log.rawCommand || '空指令' }}</strong>
+              <small>{{ log.traceId }} · {{ log.intent }}</small>
+            </article>
+          </div>
         </article>
       </div>
     </section>
@@ -221,23 +246,6 @@
             <span>{{ device.roomName }} · {{ device.name }}</span>
             <strong>{{ device.isOn ? '开启' : '关闭' }}</strong>
             <small>{{ device.propertyBadges.map((item) => `${item.label}:${item.value}`).join(' / ') }}</small>
-          </article>
-        </div>
-      </article>
-
-      <article class="voice-monitor-card">
-        <div class="section-head">
-          <div>
-            <p class="panel-kicker">Recent logs</p>
-            <h3>最近执行记录</h3>
-          </div>
-          <el-button class="refresh-button" :loading="logsLoading" @click="loadLogs">刷新</el-button>
-        </div>
-        <div class="recent-log-list compact">
-          <article v-for="log in recentLogs" :key="log.id">
-            <span :class="{ failed: !log.success }">{{ log.success ? '成功' : '失败' }}</span>
-            <strong>{{ log.commandText || log.rawCommand || '空指令' }}</strong>
-            <small>{{ log.traceId }} · {{ log.intent }}</small>
           </article>
         </div>
       </article>
@@ -262,6 +270,14 @@
         <el-button type="primary" :loading="asrConfigSaving" @click="saveAsrConfig">保存到后端</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="personalizationDialogVisible" title="个性化语音设置" width="640px" class="personalization-dialog">
+      <PersonalizationCard
+        :preference="preference"
+        :loading="preferenceLoading"
+        @saved="handlePreferenceSaved"
+      />
+    </el-dialog>
   </div>
 </template>
 
@@ -271,15 +287,20 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getCommandLogsApi, executeCommandApi } from '../api/command'
 import { getDevicesApi } from '../api/device'
+import { getFrequentCommandsApi, getUserPreferencesApi } from '../api/personalization'
 import { clearAsrConfigApi, executeVoiceAudioApi, getAsrConfigApi, getVoiceProvidersApi, saveAsrConfigApi } from '../api/voice'
+import PersonalizationCard from '../components/PersonalizationCard.vue'
 import {
   buildAssistantSpeech,
   buildCommandResultDisplay,
   cleanText,
+  formatDateTime,
   LOW_CONFIDENCE_THRESHOLD,
   normalizeCommandLog,
   normalizeCommandResult,
   normalizeDevice,
+  normalizeFrequentCommand,
+  normalizeUserPreference,
   normalizeVoiceExecuteResult,
   normalizeVoiceProviderStatus,
 } from '../utils/normalizers'
@@ -293,8 +314,11 @@ const busy = ref(false)
 const providerLoading = ref(false)
 const devicesLoading = ref(false)
 const logsLoading = ref(false)
+const preferenceLoading = ref(false)
+const frequentCommandsLoading = ref(false)
 const speechEnabled = ref(true)
 const asrConfigDialogVisible = ref(false)
+const personalizationDialogVisible = ref(false)
 const asrConfigSaving = ref(false)
 const inputMode = ref('browser')
 const userSelectedInputMode = ref(false)
@@ -303,6 +327,8 @@ const lastResult = ref(null)
 const lastError = ref(null)
 const devices = ref([])
 const recentLogs = ref([])
+const frequentCommands = ref([])
+const preference = ref(normalizeUserPreference({}))
 const providerStatus = ref(normalizeVoiceProviderStatus({}))
 
 const mediaRecorder = ref(null)
@@ -325,17 +351,6 @@ const asrConfig = ref({
   secretKey: ''
 })
 const asrConfigStatus = ref({})
-
-const exampleGroups = [
-  {
-    title: '普通指令',
-    items: ['打开客厅灯', '把卧室空调调到26度', '开启睡眠模式', '提醒我晚上八点吃药', '查询北京天气']
-  },
-  {
-    title: '粤语/方言演示',
-    items: ['帮我打开客厅冷气', '熄客厅灯', '将电视机声量调到三十', '提醒我今晚八点食药', '开启瞓觉模式']
-  }
-]
 
 const currentStepLabel = computed(() => {
   const labels = {
@@ -438,6 +453,35 @@ async function loadVoiceProviders() {
   } finally {
     providerLoading.value = false
   }
+}
+
+async function loadPreferences() {
+  preferenceLoading.value = true
+  try {
+    const data = await getUserPreferencesApi()
+    preference.value = normalizeUserPreference(data)
+    applyPreferredInputMode()
+  } finally {
+    preferenceLoading.value = false
+  }
+}
+
+function handlePreferenceSaved(data) {
+  preference.value = normalizeUserPreference(data)
+  applyPreferredInputMode()
+}
+
+function applyPreferredInputMode() {
+  if (userSelectedInputMode.value) return
+  const modeMap = {
+    cloud_asr: 'cloud',
+    browser_speech: 'browser',
+    text: 'text'
+  }
+  const preferredMode = modeMap[preference.value.preferredInputMode] || 'browser'
+  if (preferredMode === 'cloud' && !providerStatus.value.cloudConfigured) return syncPreferredInputMode()
+  if (preferredMode === 'browser' && !providerStatus.value.browserSupported) return syncPreferredInputMode()
+  inputMode.value = preferredMode
 }
 
 async function loadAsrConfig() {
@@ -727,7 +771,7 @@ async function executeTextFallback() {
   await executeTextCommand(command, 'text')
 }
 
-async function runExample(command) {
+async function runFrequentCommand(command) {
   commandText.value = command
   await executeTextCommand(command, 'text')
 }
@@ -766,7 +810,7 @@ async function finishRun(message, success = true) {
     ElMessage.warning(message)
   }
   speak(message)
-  await Promise.all([loadDevices(), loadLogs()])
+  await Promise.all([loadDevices(), loadLogs(), loadFrequentCommands()])
 }
 
 function failRun(message, source = currentInputSource.value) {
@@ -817,7 +861,7 @@ function fallbackSuggestion(message, source = currentInputSource.value) {
   if (message.includes('云端') || message.includes('录音') || message.includes('麦克风')) {
     return '可以改用浏览器识别或文本输入。'
   }
-  if (source === 'text') return '请换一种更明确的说法，或点击下方推荐指令演示。'
+  if (source === 'text') return '请换一种更明确的说法，或使用完整房间和设备名称。'
   return '请换一种说法，或使用文本输入。'
 }
 
@@ -931,6 +975,16 @@ async function loadLogs() {
   }
 }
 
+async function loadFrequentCommands() {
+  frequentCommandsLoading.value = true
+  try {
+    const data = await getFrequentCommandsApi({ limit: 5 })
+    frequentCommands.value = data.map(normalizeFrequentCommand).filter((item) => item.command)
+  } finally {
+    frequentCommandsLoading.value = false
+  }
+}
+
 function openLogDetail() {
   router.push({ name: 'logs', query: lastTraceId.value ? { trace_id: lastTraceId.value } : {} })
 }
@@ -954,8 +1008,10 @@ function nextFrame() {
 onMounted(() => {
   loadVoiceProviders()
   loadAsrConfig()
+  loadPreferences()
   loadDevices()
   loadLogs()
+  loadFrequentCommands()
 })
 
 onBeforeUnmount(() => {

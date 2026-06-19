@@ -22,6 +22,8 @@
 - `devices`：虚拟设备，保存设备类型、房间、开关状态、在线状态和 JSON 属性；初始化数据当前包含 4 个房间下的 20 个虚拟设备。
 - `command_logs`：中文指令执行日志，记录原始指令、解析结果、执行结果、成功标记和错误信息。
 - `device_status_history`：设备状态变更历史，记录变更前后状态、用户和来源。
+- `user_preferences`：用户个性化偏好，记录默认方言和默认输入方式。
+- `device_aliases`：用户设备别名，记录当前用户给虚拟设备设置的个性化称呼。
 - `reminders`：提醒事项，支持创建、查询、修改和删除。
 - `scenes`：场景信息，当前初始化回家模式、睡眠模式、离家模式。
 - `scene_actions`：场景动作，记录场景对应的设备目标状态。
@@ -32,6 +34,7 @@
 - 认证：`POST /api/auth/register`、`POST /api/auth/login`、`GET /api/auth/me`
 - 房间设备：`GET /api/rooms`、`GET /api/devices`、`GET /api/devices/{device_id}`、`PATCH /api/devices/{device_id}/state`、`GET /api/devices/{device_id}/history`、`GET /api/dashboard`
 - 中文指令：`POST /api/commands/parse`、`POST /api/commands/execute`、`GET /api/commands/logs`
+- 用户个性化：`GET /api/user/preferences`、`PATCH /api/user/preferences`、`GET /api/user/preference-suggestions`、`GET /api/user/device-aliases`、`POST /api/user/device-aliases`、`DELETE /api/user/device-aliases/{alias_id}`、`GET /api/user/frequent-commands`
 - 语音控制：`GET /api/voice/providers`、`POST /api/voice/recognize`、`POST /api/voice/execute`、`GET /api/voice/asr-config`、`POST /api/voice/asr-config`、`DELETE /api/voice/asr-config`
 - 提醒：`GET /api/reminders`、`POST /api/reminders`、`PATCH /api/reminders/{reminder_id}`、`DELETE /api/reminders/{reminder_id}`
 - 天气：`GET /api/weather`
@@ -40,24 +43,26 @@
 ## 指令解析流程
 
 1. 输入来源可以是云端 ASR transcript、浏览器 Web Speech API 识别文本或文本输入。
-2. `DialectNormalizer` 对方言词汇、粤语词、识别文本常见错词、口语词和中文数字做归一，并保留 normalization detail。
-3. `MultiCommandParser` 对常见多指令句式做规则拆分和上下文继承，例如“打开客厅灯和空调”“打开卧室空调并调到26度”，并过滤包含关系设备名，避免把“台灯”“床头灯”拆成普通“灯”。
-4. 拆分后的单条文本交给 `CommandParser`，对动作词、设备词、房间词、参数词、场景/天气/提醒关键词做意图打分。
-5. 房间和设备先做精确匹配，再做别名匹配，最后用 `difflib.SequenceMatcher` 做轻量模糊匹配。
-6. 解析成功返回 `intent`、`room`、`device_type`、`value`、`scene`、`reminder_time`、`reminder_content`、`city`、`confidence`、`matched_keywords`、`match_type` 和 `parse_detail` 等结构化字段；`parse_detail.confidence_breakdown` 用于解释 Parser 置信度来源。
-7. 批量解析返回 `is_batch`、`command_count` 和 `sub_commands`；歧义子指令会标记 `valid=false`，避免误执行。
-8. 低置信度设备控制类指令返回明确提示，不执行设备控制。
-9. 解析失败返回统一错误码 `INVALID_COMMAND`。
+2. 后端读取当前用户偏好；请求未显式传入 `dialect` 时，使用 `user_preferences.preferred_dialect` 作为默认方言模式。
+3. 后端读取当前用户 `device_aliases`；命中设备别名时，优先绑定真实 `device_id`，并在日志上下文记录 `alias_match`。
+4. `DialectNormalizer` 对方言词汇、粤语词、识别文本常见错词、口语词和中文数字做归一，并保留 normalization detail。
+5. `MultiCommandParser` 对常见多指令句式做规则拆分和上下文继承，例如“打开客厅灯和空调”“打开卧室空调并调到26度”，并过滤包含关系设备名，避免把“台灯”“床头灯”拆成普通“灯”。
+6. 拆分后的单条文本交给 `CommandParser`，对动作词、设备词、房间词、参数词、场景/天气/提醒关键词做意图打分。
+7. 房间和设备先做精确匹配，再做规则别名匹配，最后用 `difflib.SequenceMatcher` 做轻量模糊匹配；用户设备别名优先于普通设备词匹配。
+8. 解析成功返回 `intent`、`room`、`device_type`、`value`、`scene`、`reminder_time`、`reminder_content`、`city`、`confidence`、`matched_keywords`、`match_type` 和 `parse_detail` 等结构化字段；`parse_detail.confidence_breakdown` 用于解释 Parser 置信度来源。
+9. 批量解析返回 `is_batch`、`command_count` 和 `sub_commands`；歧义子指令会标记 `valid=false`，避免误执行。
+10. 低置信度设备控制类指令返回明确提示，不执行设备控制。
+11. 解析失败返回统一错误码 `INVALID_COMMAND`。
 
 ## 指令执行流程
 
 1. 前端调用 `POST /api/commands/execute` 并携带 JWT。
-2. 后端先经过方言归一、多指令拆分和 `CommandParser`，得到结构化解析结果。
+2. 后端先读取用户偏好和设备别名，再经过方言归一、多指令拆分和 `CommandParser`，得到结构化解析结果。
 3. `CommandExecutor` 根据 `intent` 执行业务动作；批量指令逐条执行，支持部分成功，不做整体回滚。
-4. 设备控制类指令会查询目标房间和设备，校验设备能力和参数范围。
+4. 设备控制类指令会查询目标房间和设备；如果命中用户设备别名，则按 `alias_match.device_id` 精确控制。
 5. 设备状态变化写入 `devices`，并同步写入 `device_status_history`。
 6. 提醒指令写入 `reminders`；天气指令优先查询 Open-Meteo，失败时读取本地备用天气；场景指令读取 `scene_actions` 批量修改设备。
-7. 无论成功或失败，均写入 `command_logs`；一次语音或批量执行只写一条日志，并在 JSON detail 中保留 ASR、方言归一、解析和执行链路。
+7. 无论成功或失败，均写入 `command_logs`；一次语音或批量执行只写一条日志，并在 JSON detail 中保留 ASR、方言归一、个性化命中、解析和执行链路。
 8. 接口返回统一响应结构，成功时包含解析结果和执行结果，失败时包含错误码和错误信息。
 
 ## 可用于测试报告的测试点
@@ -69,6 +74,11 @@
 - 修改设备状态后数据库持久化，且写入设备状态历史。
 - 中文指令解析覆盖开关、温度、亮度、音量、状态查询、场景、提醒和天气；新增设备类型仍复用同一解析和执行链路。
 - 方言/口音容错覆盖粤语重点词、西南和东北/北方口语、中文数字参数、设备别名和少量识别误差。
+- 用户偏好接口覆盖默认创建、局部更新和非法方言校验。
+- 默认方言和默认输入方式自动学习建议基于当前用户成功日志统计，达到阈值后返回可应用建议。
+- 设备别名接口覆盖新增、重复别名拒绝、删除和按当前用户隔离。
+- 设置“客厅灯 -> 小灯”后执行“打开小灯”能打开真实客厅灯，日志详情包含 `alias_match`。
+- 常用指令推荐基于当前用户成功日志返回高频指令。
 - 多指令解析覆盖常见连接词、上下文继承、部分成功和歧义子指令保护。
 - 解析结果包含 `confidence`、`confidence_breakdown`、`intent_scores`、关键词匹配和参数抽取详情。
 - 中文指令、语音指令和批量指令执行后写入 `command_logs`，日志详情包含 `trace_id`、ASR、normalization、parse、batch 和 execution 信息。
@@ -105,7 +115,9 @@
 - 第 3 阶段：规则式中文指令解析、方言/口音容错和解析接口测试。
 - 第 4 阶段：中文指令执行、批量执行、指令日志、设备状态历史、提醒、天气、场景。
 - 第 5 阶段：云端 ASR 可插拔接入、语音执行链路、日志详情和前端语音控制页。
-- 第 6 阶段：全局检查、测试补全、README 和交付文档整理。
+- 第 6 阶段：云端 ASR 配置页面、语音能力状态、日志详情和前后端联调。
+- 第 7 阶段：个性化语音交互模块，包括用户偏好、设备别名、默认方言、常用指令推荐和日志增强。
+- 第 8 阶段：全局检查、测试补全、README 和交付文档整理。
 
 建议分工：
 

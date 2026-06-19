@@ -176,7 +176,7 @@ def get_weather(city: str | None = None) -> dict[str, Any]:
             weather = _fetch_open_meteo_weather(city_name)
             _set_cached_weather(city_name, weather)
             return weather
-        except (httpx.HTTPError, ValueError, KeyError, TypeError):
+        except (httpx.HTTPError, ImportError, ValueError, KeyError, TypeError):
             pass
 
     return _mock_weather(city_name)
@@ -231,7 +231,7 @@ def _fetch_open_meteo_weather(city_name: str) -> dict[str, Any]:
         "current": "temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m",
         "timezone": "Asia/Shanghai",
     }
-    with httpx.Client(timeout=WEATHER_REQUEST_TIMEOUT_SECONDS) as client:
+    with httpx.Client(timeout=WEATHER_REQUEST_TIMEOUT_SECONDS, trust_env=False) as client:
         response = client.get(OPEN_METEO_FORECAST_URL, params=params)
         response.raise_for_status()
         payload = response.json()

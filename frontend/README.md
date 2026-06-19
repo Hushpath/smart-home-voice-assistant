@@ -1,6 +1,6 @@
 # 智能家居语音交互助手系统前端
 
-本目录是《软件工程》课程大作业的 Vue 3 前端。当前已完成统一视觉风格、Axios 请求封装、JWT 登录、Pinia 认证状态、路由守卫、基础布局、Dashboard、设备控制、语音控制、操作日志详情、提醒管理和场景模式页面。
+本目录是《软件工程》课程大作业的 Vue 3 前端。当前已完成统一视觉风格、Axios 请求封装、JWT 登录、Pinia 认证状态、路由守卫、基础布局、Dashboard、设备控制、设备别名管理、个性化语音设置、语音控制、操作日志详情、提醒管理和场景模式页面。
 
 前端语音控制页提供三种输入路径：
 
@@ -34,9 +34,12 @@ frontend/
 ├── src/
 │   ├── api/
 │   │   ├── command.js
+│   │   ├── personalization.js
 │   │   └── voice.js
 │   ├── components/
-│   │   └── LogDetailDrawer.vue
+│   │   ├── DeviceAliasDialog.vue
+│   │   ├── LogDetailDrawer.vue
+│   │   └── PersonalizationCard.vue
 │   ├── config/
 │   ├── router/
 │   ├── stores/
@@ -118,9 +121,9 @@ src/config/api.js
 
 - `/login`：登录页，已对接 `POST /api/auth/login`。
 - `/dashboard`：Dashboard 首页，展示房间数量、设备总数、在线设备数、开启设备数、天气、快捷场景、设备类型分布、家庭平面总览和最近日志。
-- `/devices`：设备管理页，展示房间筛选、设备卡片、在线/开关状态、属性调节、设备详情和设备历史抽屉。
-- `/voice`：语音控制页，展示 provider 状态，支持云端录音上传、浏览器识别、文本输入兜底和讯飞配置窗口。
-- `/logs`：操作日志页，列表展示摘要，详情抽屉展示 ASR、方言容错、解析、批量执行信息和原始 JSON。
+- `/devices`：设备管理页，展示房间筛选、设备卡片、在线/开关状态、属性调节、设备详情、设备历史抽屉和设备别名管理。
+- `/voice`：语音控制页，展示 provider 状态，支持云端录音上传、浏览器识别、文本输入兜底、讯飞配置窗口和个性化设置弹窗。
+- `/logs`：操作日志页，列表展示摘要，详情抽屉展示 ASR、方言容错、个性化命中、解析、批量执行信息和原始 JSON。
 - `/reminders`：提醒管理页，支持列表、新建、编辑、状态修改和删除。
 - `/scenes`：场景模式页，展示场景卡片并支持执行场景。
 
@@ -139,6 +142,12 @@ src/config/api.js
 - `POST /api/commands/parse`
 - `POST /api/commands/execute`
 - `GET /api/commands/logs`
+- `GET /api/user/preferences`
+- `PATCH /api/user/preferences`
+- `GET /api/user/device-aliases`
+- `POST /api/user/device-aliases`
+- `DELETE /api/user/device-aliases/{alias_id}`
+- `GET /api/user/frequent-commands`
 - `GET /api/voice/providers`
 - `POST /api/voice/recognize`
 - `POST /api/voice/execute`
@@ -202,7 +211,42 @@ GET /api/voice/providers
 
 “配置讯飞”窗口只用于填写 AppID、APIKey、APISecret 三个必要配置，并通过后端接口保存到 `backend/data/asr_config.json`。保存后立即生效，不需要重启后端。前端不保存密钥、不直连讯飞，读取配置状态时只显示脱敏后的 AppID/APIKey 和 APISecret 是否已配置。
 
-## 推荐指令
+## 个性化交互说明
+
+语音控制页的“个性化设置”按钮会打开独立弹窗，弹窗调用：
+
+```text
+GET /api/user/preferences
+PATCH /api/user/preferences
+GET /api/user/preference-suggestions
+```
+
+当前支持：
+
+- 默认方言模式：自动、普通话、粤语、西南口音、东北口语。
+- 默认输入方式：云端 ASR、浏览器识别、文本输入。
+
+弹窗会展示“自动学习建议”：后端根据最近成功日志统计默认方言和默认输入方式，当某个候选至少出现 3 次且占比达到 60% 时，页面显示“应用”按钮。点击后仍通过 `PATCH /api/user/preferences` 保存，系统不会静默修改用户偏好。
+
+设备页的设备别名管理调用：
+
+```text
+GET /api/user/device-aliases
+POST /api/user/device-aliases
+DELETE /api/user/device-aliases/{alias_id}
+```
+
+设备卡片会显示当前用户设置的别名。设置“客厅灯 -> 小灯”后，可在语音控制页执行“打开小灯”，后端会命中真实设备并在日志详情记录 `alias_match`。
+
+语音控制页的“你的常用指令”调用：
+
+```text
+GET /api/user/frequent-commands
+```
+
+语音控制页会展示当前用户的动态常用指令列表；“普通指令”和“粤语/方言演示”这类静态推荐不在主页面展示。
+
+## 演示指令
 
 普通指令：
 
@@ -223,7 +267,7 @@ GET /api/voice/providers
 - 提醒我今晚八点食药
 - 开启瞓觉模式
 
-点击推荐指令会走文本执行兜底，便于课堂演示。
+这些指令可直接在语音控制页文本输入框中执行，便于课堂演示。
 
 ## 日志展示说明
 
@@ -247,6 +291,7 @@ GET /api/voice/providers
 - 方言容错信息
 - 指令解析信息，包括 Parser 置信度和 `confidence_breakdown` 分数拆解
 - 批量执行信息
+- 个性化命中信息：默认方言和设备别名
 - 执行信息
 - 原始 JSON
 
@@ -318,16 +363,14 @@ GET /api/voice/providers
 
 1. 登录系统：使用 `testuser / test123456` 进入 Dashboard。
 2. Dashboard：查看房间数量、设备总数、在线设备数、开启设备数、天气、快捷场景、设备类型分布、家庭平面总览和最近日志。
-3. 设备页：查看设备状态和设备历史。
-4. 语音控制页：确认 provider 状态。
-5. 文本输入执行“打开客厅灯”。
-6. 执行“把卧室空调调到26度”。
-7. 执行“帮我打开客厅冷气”。
-8. 执行“将电视机声量调到三十”。
-9. 执行“开启瞓觉模式”。
-10. 执行“提醒我今晚八点食药”。
-11. 执行“打开客厅灯和空调”或“开启睡眠模式并提醒我晚上八点吃药”，查看批量结果。
-12. 打开日志列表和日志详情，查看完整链路。
+3. 语音控制页：确认 provider 状态。
+4. 在个性化设置中保存：默认方言粤语。
+5. 设备页：给“客厅灯”设置别名“小灯”，并查看设备卡片别名。
+6. 回到语音控制页执行“打开小灯”。
+7. 执行“查询北京天气”，确认天气查询可用。
+8. 执行“将电视机声量调到三十”，确认粤语词“声量”被识别为音量。
+9. 执行“打开客厅灯和空调”或“开启睡眠模式并提醒我晚上八点吃药”，查看批量结果。
+10. 打开日志列表和日志详情，查看完整链路和个性化命中信息。
 
 ## 构建检查
 
@@ -345,6 +388,8 @@ npm run build
 - Web Speech API 依赖浏览器支持；不支持时可使用文本输入兜底。
 - 云端 ASR 需要后端配置 API Key 和网络；未配置时使用浏览器识别或文本输入。
 - 前端不接入云端 ASR 厂商 SDK。
+- 常用指令推荐基于后端日志频次统计，不做复杂推荐算法。
+- 设备别名仅对当前登录用户生效。
 - 批量指令拆分在后端完成，前端只负责展示总体结果和子结果摘要。
 - 方言容错由后端完成，前端只展示结果摘要和日志详情。
 - 提醒模块只做前端 CRUD 展示，不做系统通知或后台定时推送。

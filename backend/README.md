@@ -774,6 +774,109 @@ npm run dev
 - 3 个场景：回家模式、睡眠模式、离家模式。
 - 1 个默认测试用户：`testuser`。
 
+## 个性化语音交互模块说明
+
+模块目标是在现有语音控制链路上加入用户偏好，使“默认按哪种方言习惯理解、用户怎么称呼设备”能够影响后端解析、设备执行和日志解释。
+
+新增数据库表：
+
+- `user_preferences`：每个用户最多一条偏好记录，字段包括 `preferred_dialect`、`preferred_input_mode`、`created_at`、`updated_at`。首次访问 `GET /api/user/preferences` 时自动创建默认值：自动方言、浏览器识别。
+- `device_aliases`：保存当前用户自己的设备别名，字段包括 `user_id`、`device_id`、`alias`、`created_at`、`updated_at`。同一用户下 `alias` 唯一，别名限制为 2-20 个字符。
+
+新增接口均需要 JWT：
+
+- `GET /api/user/preferences`：获取当前用户偏好，缺失时自动创建默认偏好。
+- `PATCH /api/user/preferences`：部分更新偏好。`preferred_dialect` 仅支持 `auto`、`mandarin`、`cantonese`、`southwest`、`northeast`；`preferred_input_mode` 仅支持 `cloud_asr`、`browser_speech`、`text`。
+- `GET /api/user/device-aliases`：查询当前用户设备别名。
+- `POST /api/user/device-aliases`：新增设备别名。
+- `DELETE /api/user/device-aliases/{alias_id}`：删除当前用户自己的设备别名。
+- `GET /api/user/preference-suggestions?limit=20`：基于当前用户最近成功日志生成默认方言和默认输入方式的自动学习建议。
+- `GET /api/user/frequent-commands?limit=5`：基于当前用户成功日志统计常用指令，按使用次数降序、最近使用时间降序返回。
+
+设备别名参与解析的方式：
+
+```text
+原始文本
+-> 读取当前用户 device_aliases
+-> 命中别名后把别名短语替换为真实“房间 + 设备名”
+-> DialectNormalizer
+-> MultiCommandParser / CommandParser
+-> CommandExecutor 按 alias_match.device_id 精确执行
+```
+
+例如用户给客厅灯设置“小灯”后，`打开小灯` 会被解析和执行到真实客厅灯。日志 context 和详情中记录：
+
+```json
+{
+  "alias_match": {
+    "alias": "小灯",
+    "device_id": 1,
+    "device_name": "灯",
+    "room": "客厅",
+    "device_type": "light",
+    "match_type": "user_alias"
+  }
+}
+```
+
+默认方言参与 `DialectNormalizer` 的规则：
+
+1. 请求显式传入 `dialect` 时优先使用请求值。
+2. 请求未传时使用 `user_preferences.preferred_dialect`。
+3. 用户偏好缺失时自动创建并使用 `auto`。
+
+该规则覆盖 `/api/commands/parse`、`/api/commands/execute`、`/api/voice/recognize` 和 `/api/voice/execute`。日志中通过 `preference_used.preferred_dialect` 记录实际使用的方言模式。
+
+偏好自动学习建议：
+
+- 基于 `command_logs` 中当前用户最近成功指令统计，不训练模型，不引入外部 AI。
+- 默认方言建议读取日志里的 `normalization.detected_dialect` 和 `preference_used.preferred_dialect`；例如粤语词命中较多时建议 `cantonese`。
+- 默认输入方式建议读取日志 context 中的 `input_source`；`mock_asr` 归并为 `cloud_asr`。
+- 最近样本中某个候选至少出现 3 次且占比达到 60% 时，接口返回 `can_apply=true` 和可直接 PATCH 的 `apply_payload`。
+- 后端只给建议，不静默修改用户偏好；前端由用户点击“应用”后调用 `PATCH /api/user/preferences` 保存。
+
+常用指令推荐：
+
+- 基于 `command_logs` 的简单统计，不引入复杂推荐算法。
+- 只统计当前用户、`success=true`、非空指令。
+- 按 `normalized_text` 或原始指令分组，返回 `command`、`count`、`last_used_at`、`last_success`。
+
+日志详情新增个性化信息：
+
+- `preference_used`：记录默认方言和默认输入方式。
+- `alias_match`：记录命中的用户设备别名。
+
+前端在日志详情抽屉中展示“个性化命中信息”，字段缺失时显示 `-`。
+
+测试覆盖新增内容：
+
+- 未登录访问偏好接口被拒绝。
+- 登录后自动创建并返回默认偏好。
+- 修改默认方言和默认输入方式。
+- 非法方言返回统一错误格式。
+- 自动学习建议能基于粤语成功指令返回 `preferred_dialect=cantonese`。
+- 自动学习建议能基于文本输入日志返回 `preferred_input_mode=text`。
+- 新增、重复、删除设备别名。
+- 设置“小灯”后执行 `打开小灯` 能打开真实客厅灯，并在日志中记录 `alias_match`。
+- `preferred_dialect=cantonese` 时粤语 `将电视机声量调到三十` 仍能解析执行。
+- 常用指令接口返回成功指令统计。
+- 原有 `/api/commands/execute` 和 `/api/voice/execute` 继续通过旧测试。
+
+旧数据库说明：本项目没有 Alembic。新库和 pytest 临时库会通过 `Base.metadata.create_all()` 自动创建 `user_preferences`、`device_aliases`。如果本地已有旧的 `backend/data/app.db`，请重新运行：
+
+```bash
+python -m app.db.init_db
+```
+
+如表仍不存在，可删除旧 `backend/data/app.db` 后重新初始化。
+
+当前限制：
+
+- 常用指令推荐基于简单频次统计，不使用复杂推荐算法。
+- 偏好自动学习是基于日志频次和阈值的建议，不会静默修改配置。
+- 设备别名仅对当前用户生效。
+- 默认方言模式是词典和规则优先级调整，不是完整方言 ASR 模型。
+
 ## 已知限制
 
 - 系统不训练自己的语音识别模型。

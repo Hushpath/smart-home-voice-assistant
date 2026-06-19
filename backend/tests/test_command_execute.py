@@ -343,6 +343,22 @@ def test_weather_api_falls_back_to_mock_when_open_meteo_fails(client, monkeypatc
     assert data["weather"] == "多云"
 
 
+def test_weather_api_falls_back_to_mock_when_weather_client_import_fails(client, monkeypatch):
+    def failed_weather(city_name):
+        raise ImportError(f"weather client unavailable: {city_name}")
+
+    monkeypatch.setattr(home_actions, "_fetch_open_meteo_weather", failed_weather)
+    home_actions.clear_weather_cache()
+
+    response = client.get("/api/weather?city=广州")
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["city"] == "广州"
+    assert data["source"] == "mock"
+    assert data["weather"] == "阴"
+
+
 def test_weather_api_falls_back_for_unknown_city(client):
     response = client.get("/api/weather?city=未知城市")
 

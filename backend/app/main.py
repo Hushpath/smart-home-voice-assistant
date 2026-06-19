@@ -1,10 +1,11 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
-from app.routers import auth, commands, devices, health, reminders, scenes, voice, weather
+from app.routers import auth, commands, devices, health, reminders, scenes, user, voice, weather
 from app.utils.response import error_response
 
 
@@ -29,7 +30,7 @@ async def http_exception_handler(request, exc: HTTPException):
 async def validation_exception_handler(request, exc: RequestValidationError):
     return JSONResponse(
         status_code=422,
-        content=error_response("INVALID_REQUEST", "请求参数校验失败", exc.errors()),
+        content=error_response("INVALID_REQUEST", "请求参数校验失败", jsonable_encoder(exc.errors())),
     )
 
 
@@ -50,3 +51,4 @@ app.include_router(reminders.router, prefix=settings.api_prefix)
 app.include_router(weather.router, prefix=settings.api_prefix)
 app.include_router(scenes.router, prefix=settings.api_prefix)
 app.include_router(voice.router, prefix=settings.api_prefix)
+app.include_router(user.router, prefix=settings.api_prefix)

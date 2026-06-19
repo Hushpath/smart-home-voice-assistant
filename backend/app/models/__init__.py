@@ -1,6 +1,7 @@
 from app.models.models import (
     CommandLog,
     Device,
+    DeviceAlias,
     DeviceStatusHistory,
     Home,
     Reminder,
@@ -8,11 +9,13 @@ from app.models.models import (
     Scene,
     SceneAction,
     User,
+    UserPreference,
 )
 
 __all__ = [
     "CommandLog",
     "Device",
+    "DeviceAlias",
     "DeviceStatusHistory",
     "Home",
     "Reminder",
@@ -20,4 +23,5 @@ __all__ = [
     "Scene",
     "SceneAction",
     "User",
+    "UserPreference",
 ]

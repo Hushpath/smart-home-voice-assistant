@@ -18,6 +18,7 @@ from app.services.asr_config_store import (
 )
 from app.services.command_executor import CommandExecutor
 from app.services.home_actions import BusinessError
+from app.services.personalization import get_or_create_preferences
 from app.services.speech_recognition_service import SpeechRecognitionService, generate_voice_trace_id
 from app.utils.response import error_response, success_response
 
@@ -112,11 +113,13 @@ def clear_asr_config(
 async def recognize_voice(
     audio: UploadFile | None = File(default=None),
     dialect: str | None = Form(default=None),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     service: SpeechRecognitionService = Depends(get_speech_recognition_service),
 ):
     trace_id = generate_voice_trace_id()
-    dialect = dialect or "auto"
+    preference = get_or_create_preferences(db, current_user)
+    dialect = dialect or preference.preferred_dialect or "auto"
     audio_bytes = await _read_audio_file(audio)
     try:
         result = service.recognize(
@@ -144,7 +147,8 @@ async def execute_voice(
     service: SpeechRecognitionService = Depends(get_speech_recognition_service),
 ):
     trace_id = generate_voice_trace_id()
-    dialect = dialect or "auto"
+    preference = get_or_create_preferences(db, current_user)
+    dialect = dialect or preference.preferred_dialect or "auto"
     audio_bytes = await _read_audio_file(audio)
     try:
         recognition = service.recognize(
@@ -158,6 +162,7 @@ async def execute_voice(
         raise _asr_http_exception(exc, trace_id) from exc
 
     context = _build_voice_context(recognition, trace_id, audio)
+    context["dialect"] = dialect
     executor = CommandExecutor(db=db, user=current_user)
     try:
         execution = executor.execute(recognition.transcript, context=context)

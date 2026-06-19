@@ -5,7 +5,10 @@
         <p class="panel-kicker">Device matrix</p>
         <h2>按房间管理虚拟智能设备</h2>
       </div>
-      <el-button class="refresh-button" :loading="loading" @click="loadDevices">刷新设备</el-button>
+      <div class="toolbar-actions">
+        <el-button class="refresh-button" @click="aliasVisible = true">设备别名管理</el-button>
+        <el-button class="refresh-button" :loading="loading" @click="loadDevices">刷新设备</el-button>
+      </div>
     </section>
 
     <section class="room-filter">
@@ -41,7 +44,24 @@
           @detail="openDetail(device)"
           @history="openHistory(device)"
           @adjust="openAdjust(device)"
+          @alias="openAliasDialog(device)"
         />
+      </div>
+    </section>
+
+    <section class="room-section alias-overview-section">
+      <div class="room-heading">
+        <div>
+          <span>设备别名</span>
+          <h3>{{ aliases.length }} 个别名</h3>
+        </div>
+      </div>
+      <el-empty v-if="!aliasesLoading && !aliases.length" description="暂无设备别名" :image-size="56" />
+      <div v-else class="alias-overview-list" v-loading="aliasesLoading">
+        <article v-for="alias in aliases" :key="alias.id">
+          <strong>{{ alias.alias }}</strong>
+          <span>{{ alias.roomName }} · {{ alias.deviceName }}</span>
+        </article>
       </div>
     </section>
 
@@ -149,6 +169,17 @@
         </el-timeline>
       </div>
     </el-drawer>
+
+    <DeviceAliasDialog
+      v-model="aliasVisible"
+      v-model:saving="aliasSaving"
+      v-model:deleting-id="aliasDeletingId"
+      :devices="devices"
+      :aliases="aliases"
+      :loading="aliasesLoading"
+      :initial-device-id="selectedAliasDeviceId"
+      @refresh="refreshAliases"
+    />
   </div>
 </template>
 
@@ -156,12 +187,15 @@
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getDeviceApi, getDeviceHistoryApi, getDevicesApi, getRoomsApi, updateDeviceStateApi } from '../api/device'
+import { getDeviceAliasesApi } from '../api/personalization'
+import DeviceAliasDialog from '../components/DeviceAliasDialog.vue'
 import DeviceCard from '../components/DeviceCard.vue'
 import {
   formatDateTime,
   formatDeviceState,
   formatJson,
   normalizeDevice,
+  normalizeDeviceAlias,
   normalizeDeviceHistory,
   normalizeRoom
 } from '../utils/normalizers'
@@ -183,6 +217,12 @@ const adjustSaving = ref(false)
 const adjustDevice = ref(null)
 const adjustControls = ref([])
 const adjustValues = ref({})
+const aliases = ref([])
+const aliasesLoading = ref(false)
+const aliasVisible = ref(false)
+const aliasSaving = ref(false)
+const aliasDeletingId = ref(null)
+const selectedAliasDeviceId = ref(null)
 
 const filteredDevices = computed(() => {
   if (selectedRoomId.value === null) return devices.value
@@ -216,13 +256,42 @@ async function loadDevices() {
   try {
     const [roomData, deviceData] = await Promise.all([
       getRoomsApi(),
-      getDevicesApi()
+      getDevicesApi(),
+      loadAliases()
     ])
     rooms.value = roomData.map(normalizeRoom)
-    devices.value = deviceData.map(normalizeDevice)
+    devices.value = deviceData.map((device) => withAliases(normalizeDevice(device)))
   } finally {
     loading.value = false
   }
+}
+
+async function loadAliases() {
+  aliasesLoading.value = true
+  try {
+    const data = await getDeviceAliasesApi()
+    aliases.value = data.map(normalizeDeviceAlias)
+    return aliases.value
+  } finally {
+    aliasesLoading.value = false
+  }
+}
+
+async function refreshAliases() {
+  await loadAliases()
+  devices.value = devices.value.map(withAliases)
+}
+
+function withAliases(device) {
+  return {
+    ...device,
+    aliases: aliases.value.filter((alias) => alias.deviceId === device.id).map((alias) => alias.alias)
+  }
+}
+
+function openAliasDialog(device) {
+  selectedAliasDeviceId.value = device?.id || null
+  aliasVisible.value = true
 }
 
 async function toggleDevice(device, nextState) {

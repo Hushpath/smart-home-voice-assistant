@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import relationship
 
 from app.db.session import Base
@@ -32,6 +32,8 @@ class User(Base):
     command_logs = relationship("CommandLog", back_populates="user")
     reminders = relationship("Reminder", back_populates="user")
     status_history = relationship("DeviceStatusHistory", back_populates="user")
+    preference = relationship("UserPreference", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    device_aliases = relationship("DeviceAlias", back_populates="user", cascade="all, delete-orphan")
 
 
 class Room(Base):
@@ -62,6 +64,36 @@ class Device(Base):
     room = relationship("Room", back_populates="devices")
     status_history = relationship("DeviceStatusHistory", back_populates="device")
     scene_actions = relationship("SceneAction", back_populates="device")
+    aliases = relationship("DeviceAlias", back_populates="device", cascade="all, delete-orphan")
+
+
+class UserPreference(Base):
+    __tablename__ = "user_preferences"
+    __table_args__ = (UniqueConstraint("user_id", name="uq_user_preferences_user_id"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    preferred_dialect = Column(String(20), default="auto", nullable=False)
+    preferred_input_mode = Column(String(30), default="browser_speech", nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="preference")
+
+
+class DeviceAlias(Base):
+    __tablename__ = "device_aliases"
+    __table_args__ = (UniqueConstraint("user_id", "alias", name="uq_device_aliases_user_alias"),)
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    device_id = Column(Integer, ForeignKey("devices.id"), nullable=False)
+    alias = Column(String(20), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    user = relationship("User", back_populates="device_aliases")
+    device = relationship("Device", back_populates="aliases")
 
 
 class CommandLog(Base):

@@ -5,6 +5,7 @@
       <div class="device-title">
         <span>{{ device.roomName || '未分配房间' }}</span>
         <h3>{{ device.name }}</h3>
+        <small v-if="device.aliases?.length" class="device-alias-line">别名：{{ device.aliases.join('、') }}</small>
       </div>
       <el-tag :type="device.isOnline ? 'success' : 'danger'" effect="dark" round>
         {{ device.isOnline ? '在线' : '离线' }}
@@ -40,6 +41,7 @@
       />
       <div class="device-action-buttons">
         <el-button class="ghost-action" text @click="$emit('detail')">详情</el-button>
+        <el-button class="ghost-action" text @click="$emit('alias')">别名</el-button>
         <el-button v-if="canAdjust" class="ghost-action" text @click="$emit('adjust')">调节</el-button>
         <el-button class="ghost-action" text @click="$emit('history')">历史记录</el-button>
       </div>
@@ -61,7 +63,7 @@ const props = defineProps({
   }
 })
 
-defineEmits(['toggle', 'history', 'adjust', 'detail'])
+defineEmits(['toggle', 'history', 'adjust', 'detail', 'alias'])
 
 const iconText = computed(() => {
   const map = {

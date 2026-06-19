@@ -18,23 +18,42 @@ from app.services.home_actions import (
     validate_value_range,
 )
 from app.services.multi_command_parser import MultiCommandParser, MultiCommandParseResult
+from app.services.personalization import (
+    apply_alias_to_parsed,
+    get_device_for_user,
+    get_or_create_preferences,
+    match_device_alias,
+    preference_context,
+)
 
 
 class CommandExecutor:
     def __init__(self, db: Session, user: User):
         self.db = db
         self.user = user
+        self.preference = get_or_create_preferences(db, user)
         self.parser = CommandParser()
         self.multi_parser = MultiCommandParser(parser=self.parser)
 
     def execute(self, command: str | None, context: dict[str, Any] | None = None) -> dict[str, Any]:
         started_at = time.perf_counter()
-        dialect = (context or {}).get("dialect") or "auto"
-        multi_parsed = self.multi_parser.parse(command, dialect=dialect)
+        context = self._prepare_personal_context(context)
+        dialect = context["dialect"]
+        command_for_parse, alias_match = self._rewrite_alias_command(command)
+        if alias_match:
+            context["alias_match"] = alias_match
+        multi_parsed = self.multi_parser.parse(command_for_parse, dialect=dialect)
         if multi_parsed.is_batch:
             return self._execute_batch(command, multi_parsed, context, started_at)
 
-        parsed, normalization = normalize_and_parse_command(command, parser=self.parser, dialect=dialect)
+        parsed, normalization = normalize_and_parse_command(command_for_parse, parser=self.parser, dialect=dialect)
+        if command_for_parse != (command or ""):
+            parsed.original_text = command or ""
+            parsed.parse_detail["alias_rewrite"] = {
+                "raw_command": command or "",
+                "rewritten_command": command_for_parse,
+            }
+        apply_alias_to_parsed(parsed, alias_match)
         enriched_context = self._merge_normalization_context(context, normalization.to_dict())
         if not parsed.valid:
             self._write_log(
@@ -173,7 +192,7 @@ class CommandExecutor:
         raise BusinessError("UNSUPPORTED_ACTION", "暂不支持该操作")
 
     def _set_power(self, parsed: ParseResult, is_on: bool) -> dict[str, Any]:
-        device = find_device(self.db, self.user, parsed.room, parsed.device_type)
+        device = self._find_target_device(parsed)
         return apply_device_state(
             db=self.db,
             device=device,
@@ -195,7 +214,7 @@ class CommandExecutor:
         if parsed.device_type not in expected_types:
             raise BusinessError("UNSUPPORTED_ACTION", f"该设备不支持设置{label}")
         value = validate_value_range(parsed.value, minimum, maximum, label)
-        device = find_device(self.db, self.user, parsed.room, parsed.device_type)
+        device = self._find_target_device(parsed)
         return apply_device_state(
             db=self.db,
             device=device,
@@ -268,6 +287,9 @@ class CommandExecutor:
                 response["normalization"] = context["normalization"]
             if context.get("trace_id"):
                 response["trace_id"] = context["trace_id"]
+            preference_used = context.get("preference_used") or {}
+            response["alias_match"] = context.get("alias_match")
+            response["preference_used"] = preference_used
         return response
 
     def _write_log(
@@ -381,6 +403,29 @@ class CommandExecutor:
         enriched_context.setdefault("input_source", "text")
         enriched_context["normalization"] = normalization
         return enriched_context
+
+    def _prepare_personal_context(self, context: dict[str, Any] | None) -> dict[str, Any]:
+        prepared = dict(context or {})
+        explicit_dialect = prepared.get("dialect")
+        preferred = preference_context(self.preference)
+        dialect = explicit_dialect or preferred["preferred_dialect"] or "auto"
+        prepared["dialect"] = dialect
+        prepared["preference_used"] = preferred
+        prepared["preference_used"]["preferred_dialect"] = dialect
+        return prepared
+
+    def _rewrite_alias_command(self, command: str | None) -> tuple[str | None, dict[str, Any] | None]:
+        alias_match = match_device_alias(self.db, self.user, command)
+        if not alias_match or not command:
+            return command, alias_match
+        target = f"{alias_match.get('room') or ''}{alias_match.get('device_name') or ''}"
+        return command.replace(alias_match["alias"], target, 1), alias_match
+
+    def _find_target_device(self, parsed: ParseResult):
+        alias_match = (parsed.parse_detail or {}).get("alias_match")
+        if isinstance(alias_match, dict) and alias_match.get("device_id"):
+            return get_device_for_user(self.db, self.user, alias_match["device_id"])
+        return find_device(self.db, self.user, parsed.room, parsed.device_type)
 
     def _elapsed_ms(self, started_at: float) -> int:
         return int((time.perf_counter() - started_at) * 1000)

@@ -26,6 +26,7 @@
 - 鲁棒中文指令解析与执行，支持设备控制、状态查询、场景执行、提醒创建和天气查询。
 - 多指令解析与批量执行，支持一句话中包含多个设备控制、场景、提醒或天气指令。
 - 操作日志记录 trace_id、ASR、方言归一、解析和执行全过程。
+- 个性化语音交互：支持用户偏好、设备别名、默认方言自动学习建议和常用指令推荐。
 - 提醒事项创建、查询、修改和删除。
 - 场景模式执行，当前包含回家模式、睡眠模式和离家模式。
 - 天气查询优先使用 Open-Meteo，失败时自动回退本地备用数据。
@@ -255,6 +256,12 @@ npm run build
 - `POST /api/commands/parse`
 - `POST /api/commands/execute`
 - `GET /api/commands/logs`
+- `GET /api/user/preferences`
+- `PATCH /api/user/preferences`
+- `GET /api/user/device-aliases`
+- `POST /api/user/device-aliases`
+- `DELETE /api/user/device-aliases/{alias_id}`
+- `GET /api/user/frequent-commands`
 - `GET /api/voice/providers`
 - `POST /api/voice/recognize`
 - `POST /api/voice/execute`
@@ -424,6 +431,8 @@ backend/data/app.db
 - `devices`
 - `device_status_history`
 - `command_logs`
+- `user_preferences`
+- `device_aliases`
 - `reminders`
 - `scenes`
 - `scene_actions`
@@ -467,21 +476,26 @@ npm run build
 
 1. 初始化数据库并启动后端。
 2. 启动前端并使用默认账号登录。
-3. 查看 Dashboard 和设备页。
-4. 打开语音控制页，确认 `/api/voice/providers` 状态。
-5. 执行文本指令“打开客厅灯”。
-6. 执行“把卧室空调调到26度”。
-7. 执行粤语/方言指令“帮我打开客厅冷气”“将电视机声量调到三十”“开启瞓觉模式”。
-8. 创建提醒“提醒我今晚八点食药”。
-9. 查看操作日志列表和日志详情。
-10. 查看设备历史。
+3. 进入语音控制页，确认 `/api/voice/providers` 状态。
+4. 在个性化设置中保存：默认方言粤语。
+5. 进入设备页。
+6. 给“客厅灯”设置别名“小灯”。
+7. 回到语音控制页。
+8. 执行“打开小灯”，确认客厅灯被打开。
+9. 执行“查询北京天气”，确认天气查询可用。
+10. 执行“将电视机声量调到三十”，确认粤语词“声量”被识别为音量。
+11. 打开操作日志页。
+12. 查看日志详情，确认能看到 `preference_used` 和 `alias_match`。
+13. 回到设备页，查看设备历史。
 
 推荐截图：
 
 - 登录页
 - Dashboard
 - 语音控制页
+- 个性化设置
 - 语音能力状态
+- 设备别名管理
 - 粤语指令执行结果
 - 日志列表
 - 日志详情

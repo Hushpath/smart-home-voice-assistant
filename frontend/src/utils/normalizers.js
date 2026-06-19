@@ -18,6 +18,62 @@ export function normalizeDevice(device = {}) {
   }
 }
 
+export function normalizeUserPreference(preference = {}) {
+  return {
+    id: preference.id || null,
+    userId: preference.user_id || null,
+    preferredDialect: preference.preferred_dialect || 'auto',
+    preferredInputMode: preference.preferred_input_mode || 'browser_speech',
+    createdAt: preference.created_at || null,
+    updatedAt: preference.updated_at || null
+  }
+}
+
+export function normalizeDeviceAlias(alias = {}) {
+  return {
+    id: alias.id,
+    deviceId: alias.device_id,
+    deviceName: alias.device_name || '设备',
+    roomName: alias.room_name || '-',
+    deviceType: alias.device_type || '',
+    deviceTypeLabel: getDeviceTypeLabel(alias.device_type),
+    alias: alias.alias || '-',
+    createdAt: alias.created_at || null,
+    updatedAt: alias.updated_at || null
+  }
+}
+
+export function normalizeFrequentCommand(item = {}) {
+  return {
+    command: item.command || '',
+    count: item.count || 0,
+    lastUsedAt: item.last_used_at || null,
+    lastSuccess: item.last_success !== false
+  }
+}
+
+export function normalizePreferenceSuggestions(data = {}) {
+  return {
+    windowSize: data.window_size || 20,
+    sampleCount: data.sample_count || 0,
+    dialect: normalizePreferenceSuggestion(data.dialect),
+    inputMode: normalizePreferenceSuggestion(data.input_mode)
+  }
+}
+
+function normalizePreferenceSuggestion(item = {}) {
+  return {
+    current: item.current || '',
+    suggested: item.suggested || '',
+    confidence: typeof item.confidence === 'number' ? item.confidence : 0,
+    counts: item.counts || {},
+    reason: item.reason || '暂无足够成功日志用于自动学习',
+    canApply: Boolean(item.can_apply),
+    applyPayload: item.apply_payload || {},
+    samples: Array.isArray(item.samples) ? item.samples : []
+  }
+}
+
 export function normalizeDeviceHistory(item = {}) {
   return {
     id: item.id,
@@ -112,10 +168,21 @@ export function normalizeLogDetail(detail = {}, parsedResult = {}, executionResu
       sub_commands: parsedResult.sub_commands || [],
       sub_results: execution?.sub_results || []
     },
+    personalization: normalizePersonalizationDetail(detail.personalization || execution?.context || {}),
     raw: detail.raw || {
       parsed_result: parsedResult,
       execution_result: executionResult
     }
+  }
+}
+
+export function normalizePersonalizationDetail(detail = {}) {
+  const preferenceUsed = detail.preference_used || {}
+  const aliasMatch = detail.alias_match || null
+  return {
+    preferenceUsed,
+    preferredDialect: detail.preferred_dialect || preferenceUsed.preferred_dialect || '-',
+    aliasMatch
   }
 }
 
@@ -169,7 +236,9 @@ export function normalizeCommandResult(result = {}) {
     affectedDevices: data.affected_devices || [],
     reminder: data.reminder || data.result?.reminder || null,
     weather: data.weather || data.result?.weather || null,
-    scene: data.scene || data.result?.scene || null
+    scene: data.scene || data.result?.scene || null,
+    preferenceUsed: data.preference_used || data.context?.preference_used || {},
+    aliasMatch: data.alias_match || data.context?.alias_match || null
   }
 }
 

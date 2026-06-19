@@ -85,6 +85,16 @@
         <JsonBlock title="intent_scores" :value="parse.intent_scores" />
       </section>
 
+      <section class="log-detail-section">
+        <div class="section-title"><span>个性化命中信息</span></div>
+        <div class="detail-kv-grid">
+          <div><label>默认方言</label><strong>{{ value(personalization.preferredDialect) }}</strong></div>
+          <div><label>命中别名</label><strong>{{ value(aliasText) }}</strong></div>
+        </div>
+        <JsonBlock title="alias_match" :value="personalization.aliasMatch" />
+        <JsonBlock title="preference_used" :value="personalization.preferenceUsed" />
+      </section>
+
       <section v-if="batch.is_batch" class="log-detail-section">
         <div class="section-title"><span>批量执行信息</span></div>
         <div class="detail-kv-grid">
@@ -143,6 +153,12 @@ const confidenceBreakdown = computed(() => parse.value?.confidence_breakdown || 
 const hasConfidenceBreakdown = computed(() => Object.keys(confidenceBreakdown.value).length > 0)
 const execution = computed(() => props.log?.detail?.execution || {})
 const batch = computed(() => props.log?.detail?.batch || {})
+const personalization = computed(() => props.log?.detail?.personalization || {})
+const aliasText = computed(() => {
+  const alias = personalization.value.aliasMatch
+  if (!alias) return '-'
+  return `${alias.alias || '-'} -> ${alias.room || ''}${alias.device_name || alias.deviceName || '设备'}`
+})
 const JsonBlock = {
   props: {
     title: {
@@ -199,4 +215,5 @@ function seconds(item) {
 function milliseconds(item) {
   return typeof item === 'number' ? `${item}ms` : '-'
 }
+
 </script>

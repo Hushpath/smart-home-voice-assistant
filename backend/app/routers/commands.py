@@ -10,6 +10,7 @@ from app.services.command_parser import CommandParser
 from app.services.dialect_normalizer import normalize_and_parse_command
 from app.services.home_actions import BusinessError
 from app.services.multi_command_parser import MultiCommandParser
+from app.services.personalization import get_or_create_preferences
 from app.utils.response import error_response, success_response
 
 
@@ -37,13 +38,18 @@ DEVICE_TYPE_LABELS = {
 @router.post("/parse", summary="解析中文指令")
 def parse_command(
     payload: CommandParseRequest,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    batch_result = multi_parser.parse(payload.command, dialect="auto")
+    preference = get_or_create_preferences(db, current_user)
+    dialect = payload.dialect or preference.preferred_dialect or "auto"
+    batch_result = multi_parser.parse(payload.command, dialect=dialect)
     if batch_result.is_batch:
-        return success_response(data=batch_result.to_dict(), message="解析成功")
+        data = batch_result.to_dict()
+        data["preference_used"] = {"preferred_dialect": dialect}
+        return success_response(data=data, message="解析成功")
 
-    result, normalization = normalize_and_parse_command(payload.command, parser=parser, dialect="auto")
+    result, normalization = normalize_and_parse_command(payload.command, parser=parser, dialect=dialect)
     if not result.valid:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -51,6 +57,7 @@ def parse_command(
         )
     data = result.to_dict()
     data["normalization"] = normalization.to_dict()
+    data["preference_used"] = {"preferred_dialect": dialect}
     return success_response(data=data, message="解析成功")
 
 
@@ -93,6 +100,7 @@ def serialize_command_log(log: CommandLog) -> dict:
             "parse": _build_parse_detail(parsed_result, parse_detail),
             "execution": execution_detail,
             "batch": _build_batch_detail(parsed_result, execution_result),
+            "personalization": _build_personalization_detail(context),
             "raw": {
                 "parsed_result": parsed_result,
                 "execution_result": execution_result,
@@ -191,6 +199,17 @@ def _build_batch_detail(parsed_result: dict, execution_result: dict) -> dict:
     }
 
 
+def _build_personalization_detail(context: dict) -> dict:
+    preference_used = context.get("preference_used") if isinstance(context, dict) else {}
+    if not isinstance(preference_used, dict):
+        preference_used = {}
+    return {
+        "preference_used": preference_used,
+        "preferred_dialect": preference_used.get("preferred_dialect"),
+        "alias_match": context.get("alias_match") if isinstance(context, dict) else None,
+    }
+
+
 @router.post("/execute", summary="执行中文指令")
 def execute_command(
     payload: CommandExecuteRequest,
@@ -198,8 +217,9 @@ def execute_command(
     current_user: User = Depends(get_current_user),
 ):
     executor = CommandExecutor(db=db, user=current_user)
+    context = {"dialect": payload.dialect} if payload.dialect else None
     try:
-        result = executor.execute(payload.command)
+        result = executor.execute(payload.command, context=context)
     except BusinessError as exc:
         raise HTTPException(
             status_code=exc.status_code,
