@@ -151,6 +151,11 @@ def test_parse_invalid_command(client, auth_headers):
         ("帮我把卧室空调调到二十六度", {"intent": "set_temperature", "room": "卧室", "device_type": "air_conditioner", "value": 26}),
         ("将客厅灯亮度调到八十", {"intent": "set_brightness", "room": "客厅", "device_type": "light", "value": 80}),
         ("把电视机音量调到三十", {"intent": "set_volume", "room": None, "device_type": "tv", "value": 30}),
+        ("打开书房台灯", {"intent": "turn_on", "room": "书房", "device_type": "desk_lamp"}),
+        ("把书房台灯亮度调到七十", {"intent": "set_brightness", "room": "书房", "device_type": "desk_lamp", "value": 70}),
+        ("把客厅音箱音量调到四十", {"intent": "set_volume", "room": "客厅", "device_type": "speaker", "value": 40}),
+        ("关闭卧室床头灯", {"intent": "turn_off", "room": "卧室", "device_type": "bedside_lamp"}),
+        ("打开书房空气净化器", {"intent": "turn_on", "room": "书房", "device_type": "air_purifier"}),
         ("麻烦提醒我晚上八点吃药", {"intent": "create_reminder", "reminder_time": "20:00", "reminder_content": "吃药"}),
     ],
 )

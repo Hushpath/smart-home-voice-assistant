@@ -65,16 +65,38 @@ defineEmits(['toggle', 'history', 'adjust', 'detail'])
 
 const iconText = computed(() => {
   const map = {
+    desk_lamp: '台',
+    bedside_lamp: '床',
     light: '灯',
     air_conditioner: '空',
     tv: '视',
     curtain: '帘',
-    fan: '风'
+    fan: '风',
+    robot_vacuum: '扫',
+    speaker: '音',
+    humidifier: '湿',
+    air_purifier: '净',
+    smart_plug: '插',
+    fridge: '冰',
+    smoke_sensor: '烟'
   }
   return map[props.device.type] || '控'
 })
 
 const canAdjust = computed(() => {
-  return ['light', 'air_conditioner', 'tv', 'curtain', 'fan'].includes(props.device.type)
+  return [
+    'light',
+    'desk_lamp',
+    'bedside_lamp',
+    'air_conditioner',
+    'tv',
+    'curtain',
+    'fan',
+    'speaker',
+    'humidifier',
+    'air_purifier',
+    'smart_plug',
+    'fridge'
+  ].includes(props.device.type)
 })
 </script>

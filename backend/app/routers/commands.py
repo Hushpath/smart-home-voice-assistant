@@ -17,11 +17,20 @@ router = APIRouter(prefix="/commands", tags=["中文指令"])
 parser = CommandParser()
 multi_parser = MultiCommandParser(parser=parser)
 DEVICE_TYPE_LABELS = {
+    "desk_lamp": "台灯",
+    "bedside_lamp": "床头灯",
     "light": "灯",
     "air_conditioner": "空调",
     "tv": "电视",
     "curtain": "窗帘",
     "fan": "排风扇",
+    "robot_vacuum": "扫地机器人",
+    "speaker": "音箱",
+    "humidifier": "加湿器",
+    "air_purifier": "空气净化器",
+    "smart_plug": "智能插座",
+    "fridge": "冰箱",
+    "smoke_sensor": "烟雾传感器",
 }
 
 

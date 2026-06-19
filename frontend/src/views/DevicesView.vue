@@ -298,6 +298,40 @@ function getAdjustControls(device) {
         options: ['暖黄', '暖白', '自然光', '冷白']
       }
     ],
+    desk_lamp: [
+      {
+        field: 'brightness',
+        label: '台灯亮度',
+        value: Number(properties.brightness ?? 65),
+        min: 0,
+        max: 100,
+        inputType: 'slider'
+      },
+      {
+        field: 'color_temperature',
+        label: '台灯色温',
+        value: properties.color_temperature || '冷白',
+        inputType: 'select',
+        options: ['暖黄', '暖白', '自然光', '冷白']
+      }
+    ],
+    bedside_lamp: [
+      {
+        field: 'brightness',
+        label: '床头灯亮度',
+        value: Number(properties.brightness ?? 35),
+        min: 0,
+        max: 100,
+        inputType: 'slider'
+      },
+      {
+        field: 'color_temperature',
+        label: '床头灯色温',
+        value: properties.color_temperature || '暖黄',
+        inputType: 'select',
+        options: ['暖黄', '暖白', '自然光', '冷白']
+      }
+    ],
     air_conditioner: [
       {
         field: 'temperature',
@@ -356,6 +390,76 @@ function getAdjustControls(device) {
         value: properties.speed || '中速',
         inputType: 'select',
         options: ['低速', '中速', '高速']
+      }
+    ],
+    speaker: [
+      {
+        field: 'volume',
+        label: '音箱音量',
+        value: Number(properties.volume ?? 35),
+        min: 0,
+        max: 100,
+        inputType: 'slider'
+      },
+      {
+        field: 'mode',
+        label: '音箱模式',
+        value: properties.mode || '待机',
+        inputType: 'select',
+        options: ['待机', '播放', '静音']
+      }
+    ],
+    humidifier: [
+      {
+        field: 'humidity_target',
+        label: '目标湿度',
+        value: Number(properties.humidity_target ?? 55),
+        min: 30,
+        max: 80,
+        inputType: 'slider'
+      },
+      {
+        field: 'mode',
+        label: '加湿模式',
+        value: properties.mode || '自动',
+        inputType: 'select',
+        options: ['低档', '自动', '睡眠']
+      }
+    ],
+    air_purifier: [
+      {
+        field: 'mode',
+        label: '净化模式',
+        value: properties.mode || '自动',
+        inputType: 'select',
+        options: ['低速', '自动', '强力']
+      }
+    ],
+    smart_plug: [
+      {
+        field: 'power_watt',
+        label: '当前功率',
+        value: Number(properties.power_watt ?? 0),
+        min: 0,
+        max: 2400,
+        inputType: 'slider'
+      }
+    ],
+    fridge: [
+      {
+        field: 'temperature',
+        label: '冷藏温度',
+        value: Number(properties.temperature ?? 4),
+        min: 2,
+        max: 8,
+        inputType: 'slider'
+      },
+      {
+        field: 'mode',
+        label: '冰箱模式',
+        value: properties.mode || '保鲜',
+        inputType: 'select',
+        options: ['保鲜', '节能', '速冷']
       }
     ]
   }

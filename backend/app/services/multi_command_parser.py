@@ -277,14 +277,36 @@ class MultiCommandParser:
         return self._dedupe_ordered(matches)
 
     def _ordered_devices(self, text: str) -> list[str]:
-        matches: list[tuple[int, str]] = []
+        matches: list[tuple[int, int, str]] = []
         for device_type, aliases in DEVICE_ALIASES.items():
             for alias in sorted(aliases, key=len, reverse=True):
                 position = text.find(alias)
                 if position >= 0:
-                    matches.append((position, device_type))
+                    end = position + len(alias)
+                    if self._overlaps_room_alias(text, position, end):
+                        continue
+                    matches.append((position, end, device_type))
                     break
-        return self._dedupe_ordered(matches)
+        filtered = [
+            item
+            for item in matches
+            if not any(
+                other is not item and other[0] <= item[0] and other[1] >= item[1] and (other[1] - other[0]) > (item[1] - item[0])
+                for other in matches
+            )
+        ]
+        return self._dedupe_ordered([(start, device_type) for start, _, device_type in filtered])
+
+    def _overlaps_room_alias(self, text: str, start: int, end: int) -> bool:
+        for aliases in ROOM_ALIASES.values():
+            for alias in aliases:
+                room_start = text.find(alias)
+                if room_start < 0:
+                    continue
+                room_end = room_start + len(alias)
+                if start < room_end and end > room_start:
+                    return True
+        return False
 
     def _dedupe_ordered(self, matches: list[tuple[int, str]]) -> list[str]:
         ordered: list[str] = []

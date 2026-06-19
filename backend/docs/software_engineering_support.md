@@ -19,7 +19,7 @@
 - `users`：用户账号、密码哈希、昵称、所属家庭和启用状态。
 - `homes`：家庭信息。
 - `rooms`：房间信息，当前初始化客厅、卧室、厨房、书房。
-- `devices`：虚拟设备，保存设备类型、房间、开关状态、在线状态和 JSON 属性。
+- `devices`：虚拟设备，保存设备类型、房间、开关状态、在线状态和 JSON 属性；初始化数据当前包含 4 个房间下的 20 个虚拟设备。
 - `command_logs`：中文指令执行日志，记录原始指令、解析结果、执行结果、成功标记和错误信息。
 - `device_status_history`：设备状态变更历史，记录变更前后状态、用户和来源。
 - `reminders`：提醒事项，支持创建、查询、修改和删除。
@@ -41,7 +41,7 @@
 
 1. 输入来源可以是云端 ASR transcript、浏览器 Web Speech API 识别文本或文本输入。
 2. `DialectNormalizer` 对方言词汇、粤语词、识别文本常见错词、口语词和中文数字做归一，并保留 normalization detail。
-3. `MultiCommandParser` 对常见多指令句式做规则拆分和上下文继承，例如“打开客厅灯和空调”“打开卧室空调并调到26度”。
+3. `MultiCommandParser` 对常见多指令句式做规则拆分和上下文继承，例如“打开客厅灯和空调”“打开卧室空调并调到26度”，并过滤包含关系设备名，避免把“台灯”“床头灯”拆成普通“灯”。
 4. 拆分后的单条文本交给 `CommandParser`，对动作词、设备词、房间词、参数词、场景/天气/提醒关键词做意图打分。
 5. 房间和设备先做精确匹配，再做别名匹配，最后用 `difflib.SequenceMatcher` 做轻量模糊匹配。
 6. 解析成功返回 `intent`、`room`、`device_type`、`value`、`scene`、`reminder_time`、`reminder_content`、`city`、`confidence`、`matched_keywords`、`match_type` 和 `parse_detail` 等结构化字段；`parse_detail.confidence_breakdown` 用于解释 Parser 置信度来源。
@@ -67,7 +67,7 @@
 - 未携带 JWT 访问受保护接口返回 `UNAUTHORIZED`。
 - 查询房间、设备和 dashboard 返回初始化数据。
 - 修改设备状态后数据库持久化，且写入设备状态历史。
-- 中文指令解析覆盖开关、温度、亮度、音量、状态查询、场景、提醒和天气。
+- 中文指令解析覆盖开关、温度、亮度、音量、状态查询、场景、提醒和天气；新增设备类型仍复用同一解析和执行链路。
 - 方言/口音容错覆盖粤语重点词、西南和东北/北方口语、中文数字参数、设备别名和少量识别误差。
 - 多指令解析覆盖常见连接词、上下文继承、部分成功和歧义子指令保护。
 - 解析结果包含 `confidence`、`confidence_breakdown`、`intent_scores`、关键词匹配和参数抽取详情。

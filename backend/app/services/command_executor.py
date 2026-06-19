@@ -146,9 +146,9 @@ class CommandExecutor:
         if parsed.intent == "set_temperature":
             return self._set_property(parsed, "air_conditioner", "temperature", 16, 30, "温度")
         if parsed.intent == "set_brightness":
-            return self._set_property(parsed, "light", "brightness", 0, 100, "亮度")
+            return self._set_property(parsed, {"light", "desk_lamp", "bedside_lamp"}, "brightness", 0, 100, "亮度")
         if parsed.intent == "set_volume":
-            return self._set_property(parsed, "tv", "volume", 0, 100, "音量")
+            return self._set_property(parsed, {"tv", "speaker"}, "volume", 0, 100, "音量")
         if parsed.intent == "query_status":
             return {
                 "devices": [
@@ -185,13 +185,14 @@ class CommandExecutor:
     def _set_property(
         self,
         parsed: ParseResult,
-        expected_device_type: str,
+        expected_device_type: str | set[str],
         property_name: str,
         minimum: int,
         maximum: int,
         label: str,
     ) -> dict[str, Any]:
-        if parsed.device_type != expected_device_type:
+        expected_types = {expected_device_type} if isinstance(expected_device_type, str) else expected_device_type
+        if parsed.device_type not in expected_types:
             raise BusinessError("UNSUPPORTED_ACTION", f"该设备不支持设置{label}")
         value = validate_value_range(parsed.value, minimum, maximum, label)
         device = find_device(self.db, self.user, parsed.room, parsed.device_type)

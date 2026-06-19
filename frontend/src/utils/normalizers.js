@@ -284,11 +284,20 @@ export function normalizeWeather(weather = {}) {
 
 export function getDeviceTypeLabel(type) {
   const typeMap = {
+    desk_lamp: '台灯',
+    bedside_lamp: '床头灯',
     light: '灯光',
     air_conditioner: '空调',
     tv: '电视',
     curtain: '窗帘',
-    fan: '排风扇'
+    fan: '排风扇',
+    robot_vacuum: '扫地机器人',
+    speaker: '音箱',
+    humidifier: '加湿器',
+    air_purifier: '空气净化器',
+    smart_plug: '智能插座',
+    fridge: '冰箱',
+    smoke_sensor: '烟雾传感器'
   }
   return typeMap[type] || type || '未知设备'
 }
@@ -304,6 +313,11 @@ export function normalizeDeviceProperties(type, properties = {}) {
   if (properties.fan_speed !== undefined) badges.push({ label: '风量', value: properties.fan_speed })
   if (properties.channel !== undefined) badges.push({ label: '频道', value: properties.channel })
   if (properties.color_temperature !== undefined) badges.push({ label: '色温', value: properties.color_temperature })
+  if (properties.humidity_target !== undefined) badges.push({ label: '目标湿度', value: `${properties.humidity_target}%` })
+  if (properties.battery !== undefined) badges.push({ label: '电量', value: `${properties.battery}%` })
+  if (properties.air_quality !== undefined) badges.push({ label: '空气质量', value: properties.air_quality })
+  if (properties.power_watt !== undefined) badges.push({ label: '功率', value: `${properties.power_watt}W` })
+  if (properties.status !== undefined) badges.push({ label: '状态', value: properties.status })
 
   if (!badges.length && type) {
     badges.push({ label: '类型', value: getDeviceTypeLabel(type) })
@@ -419,11 +433,20 @@ function getAssistantDeviceName(item = {}, result = {}, parsed = {}) {
 
 function getAssistantDeviceTypeLabel(type) {
   const typeMap = {
+    desk_lamp: '台灯',
+    bedside_lamp: '床头灯',
     light: '灯',
     air_conditioner: '空调',
     tv: '电视',
     curtain: '窗帘',
-    fan: '排风扇'
+    fan: '排风扇',
+    robot_vacuum: '扫地机器人',
+    speaker: '音箱',
+    humidifier: '加湿器',
+    air_purifier: '空气净化器',
+    smart_plug: '智能插座',
+    fridge: '冰箱',
+    smoke_sensor: '烟雾传感器'
   }
   return typeMap[type] || getDeviceTypeLabel(type)
 }

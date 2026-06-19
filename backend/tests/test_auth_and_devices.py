@@ -90,7 +90,7 @@ def test_list_devices_and_filter_by_room(client, auth_headers):
     filtered_response = client.get(f"/api/devices?room_id={living_room_id}", headers=auth_headers)
 
     assert all_response.status_code == 200
-    assert len(all_response.json()["data"]) == 11
+    assert len(all_response.json()["data"]) == 20
     assert filtered_response.status_code == 200
     assert {device["room_name"] for device in filtered_response.json()["data"]} == {"客厅"}
 
@@ -151,6 +151,6 @@ def test_dashboard(client, auth_headers):
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["room_count"] == 4
-    assert data["device_count"] == 11
-    assert data["online_device_count"] == 11
-    assert data["on_device_count"] == 0
+    assert data["device_count"] == 20
+    assert data["online_device_count"] == 20
+    assert data["on_device_count"] == 2

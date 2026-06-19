@@ -15,18 +15,36 @@ ROOM_ALIASES = {
     "卫生间": ["卫生间", "厕所", "洗手间"],
 }
 DEVICE_ALIASES = {
+    "desk_lamp": ["台灯", "书桌灯"],
+    "bedside_lamp": ["床头灯", "床边灯"],
     "light": ["灯", "灯光", "电灯", "等"],
     "air_conditioner": ["空调", "冷气"],
     "tv": ["电视", "电视机"],
     "curtain": ["窗帘", "帘子"],
     "fan": ["排风扇", "风扇"],
+    "robot_vacuum": ["扫地机器人", "扫地机"],
+    "speaker": ["音箱", "音响", "智能音箱"],
+    "humidifier": ["加湿器"],
+    "air_purifier": ["空气净化器", "净化器"],
+    "smart_plug": ["智能插座", "插座"],
+    "fridge": ["冰箱"],
+    "smoke_sensor": ["烟雾传感器", "烟感", "烟雾报警器"],
 }
 DEVICE_CANONICAL_NAME = {
+    "desk_lamp": "台灯",
+    "bedside_lamp": "床头灯",
     "light": "灯",
     "air_conditioner": "空调",
     "tv": "电视",
     "curtain": "窗帘",
     "fan": "排风扇",
+    "robot_vacuum": "扫地机器人",
+    "speaker": "音箱",
+    "humidifier": "加湿器",
+    "air_purifier": "空气净化器",
+    "smart_plug": "智能插座",
+    "fridge": "冰箱",
+    "smoke_sensor": "烟雾传感器",
 }
 SCENE_KEYWORDS = ["睡眠模式", "回家模式", "离家模式"]
 CITY_KEYWORDS = ["北京", "上海", "广州", "深圳", "杭州", "南京", "成都", "重庆", "西安", "武汉"]
@@ -395,8 +413,11 @@ class CommandParser:
 
     def _match_device(self, text: str) -> dict[str, Any]:
         for device_type, aliases in DEVICE_ALIASES.items():
-            for alias in aliases:
-                if alias in text:
+            for alias in sorted(aliases, key=len, reverse=True):
+                position = text.find(alias)
+                if position >= 0:
+                    if self._overlaps_room_alias(text, position, len(alias)):
+                        continue
                     match_type = "exact" if alias == DEVICE_CANONICAL_NAME[device_type] else "alias"
                     if alias == "等":
                         match_type = "fuzzy"
@@ -412,6 +433,19 @@ class CommandParser:
         if match.get("device_type"):
             match["device_name"] = DEVICE_CANONICAL_NAME[match["device_type"]]
         return match
+
+    def _overlaps_room_alias(self, text: str, position: int, length: int) -> bool:
+        start = position
+        end = position + length
+        for aliases in ROOM_ALIASES.values():
+            for alias in aliases:
+                room_start = text.find(alias)
+                if room_start < 0:
+                    continue
+                room_end = room_start + len(alias)
+                if start < room_end and end > room_start:
+                    return True
+        return False
 
     def _fuzzy_match(self, text: str, aliases: dict[str, list[str]], key: str) -> dict[str, Any]:
         best = {key: None, "matched_text": None, "match_type": None, "score": 0.0, "matched_keywords": []}

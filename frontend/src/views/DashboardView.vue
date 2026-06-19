@@ -30,37 +30,54 @@
     </section>
 
     <section class="dashboard-lower-grid">
-      <article class="weather-card">
-        <div class="weather-card-main">
-          <div class="weather-card-head">
-            <div>
-              <p class="panel-kicker">Weather</p>
-              <h3>{{ weather.city }} · {{ weather.weather }}</h3>
+      <div class="dashboard-side-stack">
+        <article class="weather-card">
+          <div class="weather-card-main">
+            <div class="weather-card-head">
+              <div>
+                <p class="panel-kicker">Weather</p>
+                <h3>{{ weather.city }} · {{ weather.weather }}</h3>
+              </div>
+              <el-select
+                v-model="selectedWeatherCity"
+                class="weather-city-select"
+                size="small"
+                filterable
+                allow-create
+                default-first-option
+                popper-class="weather-city-popper"
+                :reserve-keyword="false"
+                :loading="weatherLoading"
+                @change="loadWeather"
+              >
+                <el-option v-for="city in weatherCityOptions" :key="city" :label="city" :value="city" />
+              </el-select>
             </div>
-            <el-select
-              v-model="selectedWeatherCity"
-              class="weather-city-select"
-              size="small"
-              filterable
-              allow-create
-              default-first-option
-              popper-class="weather-city-popper"
-              :reserve-keyword="false"
-              :loading="weatherLoading"
-              @change="loadWeather"
-            >
-              <el-option v-for="city in weatherCityOptions" :key="city" :label="city" :value="city" />
-            </el-select>
+            <p>{{ weather.advice }}</p>
+            <small class="weather-source-note">{{ weather.sourceLabel }}</small>
           </div>
-          <p>{{ weather.advice }}</p>
-          <small class="weather-source-note">{{ weather.sourceLabel }}</small>
-        </div>
-        <div class="weather-meter">
-          <strong>{{ weather.temperature ?? '--' }}℃</strong>
-          <span>湿度 {{ weather.humidity ?? '--' }}%</span>
-          <span>风速 {{ weather.windSpeed ?? '--' }} km/h</span>
-        </div>
-      </article>
+          <div class="weather-meter">
+            <strong>{{ weather.temperature ?? '--' }}℃</strong>
+            <span>湿度 {{ weather.humidity ?? '--' }}%</span>
+            <span>风速 {{ weather.windSpeed ?? '--' }} km/h</span>
+          </div>
+        </article>
+
+        <article class="scene-shortcuts">
+          <p class="panel-kicker">Scene shortcuts</p>
+          <h3>快捷场景入口</h3>
+          <div class="scene-chip-list">
+            <button
+              v-for="scene in scenes"
+              :key="scene.id"
+              :disabled="runningSceneId === scene.id"
+              @click="runDashboardScene(scene)"
+            >
+              {{ runningSceneId === scene.id ? '执行中...' : scene.name }}
+            </button>
+          </div>
+        </article>
+      </div>
 
       <article class="device-insight-card">
         <p class="panel-kicker">Device mix</p>
@@ -74,18 +91,40 @@
         </div>
       </article>
 
-      <article class="scene-shortcuts">
-        <p class="panel-kicker">Scene shortcuts</p>
-        <h3>快捷场景入口</h3>
-        <div class="scene-chip-list">
-          <button
-            v-for="scene in scenes"
-            :key="scene.id"
-            :disabled="runningSceneId === scene.id"
-            @click="runDashboardScene(scene)"
+      <article class="home-floor-card">
+        <div class="home-floor-head">
+          <div>
+            <p class="panel-kicker">Home plan</p>
+            <h3>家庭平面总览</h3>
+          </div>
+          <div class="floor-legend">
+            <span><i class="on"></i>运行</span>
+            <span><i></i>关闭</span>
+          </div>
+        </div>
+        <div class="floor-plan-canvas" aria-label="家庭平面总览">
+          <div
+            v-for="room in floorPlanRooms"
+            :key="room.key"
+            class="floor-room"
+            :class="{ active: getRoomStats(room.name).onCount, empty: !getRoomStats(room.name).total }"
+            :style="room.style"
           >
-            {{ runningSceneId === scene.id ? '执行中...' : scene.name }}
-          </button>
+            <div class="floor-room-info">
+              <strong>{{ room.name }}</strong>
+              <span>{{ getRoomStats(room.name).onCount }} / {{ getRoomStats(room.name).total }} 运行</span>
+            </div>
+          </div>
+          <div
+            v-for="device in floorPlanDevices"
+            :key="device.id"
+            class="floor-device-dot"
+            :class="{ on: device.isOn, offline: !device.isOnline }"
+            :style="{ left: `${device.x}%`, top: `${device.y}%` }"
+            :title="`${device.roomName || ''}${device.name || device.typeLabel}`"
+          >
+            <span>{{ getDevicePlanLabel(device) }}</span>
+          </div>
         </div>
       </article>
     </section>
@@ -180,7 +219,7 @@ const deviceTypeStats = computed(() => {
     current.count += 1
     typeMap.set(key, current)
   })
-  return Array.from(typeMap.values()).sort((a, b) => b.count - a.count).slice(0, 5)
+  return Array.from(typeMap.values()).sort((a, b) => b.count - a.count)
 })
 
 async function loadDashboard() {
@@ -196,7 +235,7 @@ async function loadDashboard() {
     Object.assign(dashboard, normalizeDashboard(dashboardData))
     Object.assign(weather, normalizeWeather(weatherData))
     scenes.value = sceneData.map(normalizeScene)
-    recentLogs.value = logData.map(normalizeCommandLog).slice(0, 4)
+    recentLogs.value = logData.map(normalizeCommandLog).slice(0, 3)
     devices.value = deviceData.map(normalizeDevice)
   } finally {
     loading.value = false
@@ -226,4 +265,97 @@ async function runDashboardScene(scene) {
 }
 
 onMounted(loadDashboard)
+
+const floorPlanRooms = [
+  { key: 'living', name: '客厅', style: { left: '4%', top: '8%', width: '50%', height: '46%' } },
+  { key: 'bedroom', name: '卧室', style: { left: '58%', top: '8%', width: '38%', height: '38%' } },
+  { key: 'kitchen', name: '厨房', style: { left: '4%', top: '58%', width: '32%', height: '34%' } },
+  { key: 'study', name: '书房', style: { left: '40%', top: '55%', width: '56%', height: '37%' } }
+]
+
+const floorDeviceSlots = {
+  '客厅:light': { x: 30, y: 23 },
+  '客厅:air_conditioner': { x: 45, y: 23 },
+  '客厅:tv': { x: 30, y: 38 },
+  '客厅:curtain': { x: 45, y: 38 },
+  '客厅:robot_vacuum': { x: 30, y: 50 },
+  '客厅:speaker': { x: 45, y: 50 },
+  '卧室:light': { x: 75, y: 22 },
+  '卧室:air_conditioner': { x: 90, y: 22 },
+  '卧室:curtain': { x: 90, y: 34 },
+  '卧室:bedside_lamp': { x: 75, y: 39 },
+  '卧室:humidifier': { x: 90, y: 43 },
+  '厨房:light': { x: 22, y: 72 },
+  '厨房:fan': { x: 31, y: 72 },
+  '厨房:fridge': { x: 22, y: 86 },
+  '厨房:smoke_sensor': { x: 31, y: 86 },
+  '书房:light': { x: 59, y: 69 },
+  '书房:air_conditioner': { x: 84, y: 69 },
+  '书房:desk_lamp': { x: 59, y: 82 },
+  '书房:air_purifier': { x: 84, y: 82 },
+  '书房:smart_plug': { x: 72, y: 88 }
+}
+
+const roomStats = computed(() => {
+  const statsMap = new Map()
+  floorPlanRooms.forEach((room) => {
+    statsMap.set(room.name, { total: 0, onCount: 0 })
+  })
+  devices.value.forEach((device) => {
+    const roomName = device.roomName || '客厅'
+    const current = statsMap.get(roomName) || { total: 0, onCount: 0 }
+    current.total += 1
+    if (device.isOn) current.onCount += 1
+    statsMap.set(roomName, current)
+  })
+  return statsMap
+})
+
+const floorPlanDevices = computed(() =>
+  devices.value.map((device, index) => {
+    const slot = floorDeviceSlots[`${device.roomName}:${device.type}`] || getFallbackDeviceSlot(device, index)
+    return {
+      ...device,
+      x: slot.x,
+      y: slot.y
+    }
+  })
+)
+
+function getRoomStats(roomName) {
+  return roomStats.value.get(roomName) || { total: 0, onCount: 0 }
+}
+
+function getFallbackDeviceSlot(device, index) {
+  const room = floorPlanRooms.find((item) => item.name === device.roomName) || floorPlanRooms[0]
+  const left = parseFloat(room.style.left)
+  const top = parseFloat(room.style.top)
+  const width = parseFloat(room.style.width)
+  const height = parseFloat(room.style.height)
+  return {
+    x: left + width * (0.28 + (index % 3) * 0.2),
+    y: top + height * (0.35 + (index % 2) * 0.22)
+  }
+}
+
+function getDevicePlanLabel(device) {
+  const labelMap = {
+    desk_lamp: '台灯',
+    bedside_lamp: '床头灯',
+    light: '灯',
+    air_conditioner: '空调',
+    tv: '电视',
+    curtain: '窗帘',
+    fan: '排风扇',
+    robot_vacuum: '扫地机',
+    speaker: '音箱',
+    humidifier: '加湿器',
+    air_purifier: '净化器',
+    smart_plug: '插座',
+    fridge: '冰箱',
+    smoke_sensor: '烟感'
+  }
+  if (labelMap[device.type]) return labelMap[device.type]
+  return (device.name || device.typeLabel || '设备').replace(device.roomName || '', '')
+}
 </script>

@@ -118,7 +118,7 @@ def test_execute_scene_and_reminder_batch(client, auth_headers, testing_session_
     db = testing_session_factory()
     try:
         assert db.query(Reminder).filter(Reminder.title == "吃药").count() == 1
-        assert db.query(DeviceStatusHistory).count() == 3
+        assert db.query(DeviceStatusHistory).count() == 5
         assert db.query(CommandLog).count() == 1
     finally:
         db.close()

@@ -120,6 +120,11 @@ function formatSceneDeviceSummary(state = {}, device = {}) {
   if (properties.channel !== undefined) parts.push(properties.channel)
   if (properties.speed !== undefined) parts.push(`风速 ${properties.speed}`)
   if (properties.color_temperature !== undefined) parts.push(properties.color_temperature)
+  if (properties.humidity_target !== undefined) parts.push(`湿度 ${properties.humidity_target}%`)
+  if (properties.battery !== undefined) parts.push(`电量 ${properties.battery}%`)
+  if (properties.air_quality !== undefined) parts.push(`空气 ${properties.air_quality}`)
+  if (properties.power_watt !== undefined) parts.push(`功率 ${properties.power_watt}W`)
+  if (properties.status !== undefined) parts.push(properties.status)
   return parts.length ? parts.join(' · ') : '状态已更新'
 }
 

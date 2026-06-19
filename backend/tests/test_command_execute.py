@@ -92,20 +92,53 @@ def test_execute_set_volume(client, auth_headers, testing_session_factory):
         db.close()
 
 
+def test_execute_turn_on_new_study_devices(client, auth_headers, testing_session_factory):
+    lamp_response = execute_command(client, auth_headers, "打开书房台灯")
+    purifier_response = execute_command(client, auth_headers, "打开书房空气净化器")
+
+    assert lamp_response.status_code == 200
+    assert purifier_response.status_code == 200
+
+    db = testing_session_factory()
+    try:
+        assert get_device_by_room_and_type(db, "书房", "desk_lamp").is_on is True
+        assert get_device_by_room_and_type(db, "书房", "air_purifier").is_on is True
+        assert db.query(DeviceStatusHistory).count() == 2
+    finally:
+        db.close()
+
+
+def test_execute_adjust_new_device_properties(client, auth_headers, testing_session_factory):
+    lamp_response = execute_command(client, auth_headers, "把书房台灯亮度调到70")
+    speaker_response = execute_command(client, auth_headers, "把客厅音箱音量调到40")
+
+    assert lamp_response.status_code == 200
+    assert speaker_response.status_code == 200
+
+    db = testing_session_factory()
+    try:
+        assert get_device_by_room_and_type(db, "书房", "desk_lamp").properties["brightness"] == 70
+        assert get_device_by_room_and_type(db, "客厅", "speaker").properties["volume"] == 40
+    finally:
+        db.close()
+
+
 def test_execute_sleep_scene(client, auth_headers, testing_session_factory):
     response = execute_command(client, auth_headers, "开启睡眠模式")
 
     assert response.status_code == 200
     result = response.json()["data"]["result"]
     assert result["scene"]["name"] == "睡眠模式"
-    assert len(result["changes"]) == 3
+    assert len(result["changes"]) == 5
 
     db = testing_session_factory()
     try:
         bedroom_ac = get_device_by_room_and_type(db, "卧室", "air_conditioner")
+        humidifier = get_device_by_room_and_type(db, "卧室", "humidifier")
         assert bedroom_ac.is_on is True
         assert bedroom_ac.properties["mode"] == "睡眠"
-        assert db.query(DeviceStatusHistory).count() == 3
+        assert humidifier.is_on is True
+        assert db.query(DeviceStatusHistory).count() == 5
     finally:
         db.close()
 
@@ -330,7 +363,7 @@ def test_scene_api_list_and_run(client, auth_headers, testing_session_factory):
 
     db = testing_session_factory()
     try:
-        assert db.query(DeviceStatusHistory).count() == 3
+        assert db.query(DeviceStatusHistory).count() == 5
     finally:
         db.close()
 
