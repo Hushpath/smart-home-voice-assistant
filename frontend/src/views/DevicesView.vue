@@ -4,7 +4,6 @@
       <div>
         <p class="panel-kicker">Device matrix</p>
         <h2>按房间管理虚拟智能设备</h2>
-        <p>设备数据来自后端 SQLite，手动开关会调用 PATCH 接口并写入设备状态历史。</p>
       </div>
       <el-button class="refresh-button" :loading="loading" @click="loadDevices">刷新设备</el-button>
     </section>
@@ -30,7 +29,6 @@
           <span>{{ group.room.name }}</span>
           <h3>{{ group.devices.length }} 台设备</h3>
         </div>
-        <small>room_id: {{ group.room.id ?? '--' }}</small>
       </div>
 
       <div class="device-grid" v-loading="loading">
