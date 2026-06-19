@@ -208,8 +208,13 @@ class MultiCommandParser:
         guarded.error_code = "AMBIGUOUS_SUB_COMMAND"
         guarded.message = f"子指令“{text}”缺少{'和'.join(missing)}，为避免误执行已跳过。"
         guarded.confidence = min(parsed.confidence, 0.45)
+        parse_detail = dict(parsed.parse_detail or {})
+        breakdown = parse_detail.get("confidence_breakdown")
+        if isinstance(breakdown, dict):
+            breakdown = {**breakdown, "ambiguity_guard_cap": 0.45, "final_confidence": guarded.confidence}
+            parse_detail["confidence_breakdown"] = breakdown
         guarded.parse_detail = {
-            **(parsed.parse_detail or {}),
+            **parse_detail,
             "multi_command_ambiguity": {
                 "missing": missing,
                 "reason": "batch state-changing sub-command requires explicit or inherited room and device",

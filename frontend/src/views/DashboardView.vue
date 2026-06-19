@@ -4,7 +4,6 @@
       <div>
         <p class="panel-kicker">Control center</p>
         <h2>家庭运行概览</h2>
-        <p>实时汇总设备、场景、天气和最近指令，适合课堂演示时一屏展示系统状态。</p>
       </div>
       <div class="dashboard-status-strip">
         <div>
@@ -78,7 +77,6 @@
       <article class="scene-shortcuts">
         <p class="panel-kicker">Scene shortcuts</p>
         <h3>快捷场景入口</h3>
-        <p>直接执行后端场景联动，执行成功后自动刷新 Dashboard 统计。</p>
         <div class="scene-chip-list">
           <button
             v-for="scene in scenes"

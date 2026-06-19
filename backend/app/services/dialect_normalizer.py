@@ -3,7 +3,7 @@ import unicodedata
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from app.services.command_parser import CommandParser, ParseResult
+from app.services.command_parser import LOW_CONFIDENCE_THRESHOLD, CommandParser, ParseResult
 
 
 SUPPORTED_DIALECTS = {"auto", "mandarin", "cantonese", "southwest", "northeast"}
@@ -273,21 +273,30 @@ def _attach_normalization(parsed: ParseResult, normalization: DialectNormalizati
 def _adjust_confidence(parsed: ParseResult, normalization: DialectNormalizationResult) -> None:
     adjustments: list[str] = []
     confidence = parsed.confidence
+    breakdown = parsed.parse_detail.get("confidence_breakdown")
+    if not isinstance(breakdown, dict):
+        breakdown = None
     if normalization.asr_corrections:
         if parsed.match_type == "exact":
             parsed.match_type = "fuzzy"
         penalty = min(0.12, len(normalization.asr_corrections) * 0.04)
         confidence -= penalty
-        adjustments.append(f"ASR 错词纠正降低 {penalty:.2f}")
+        adjustments.append(f"识别文本纠错降低 {penalty:.2f}")
+        if breakdown is not None:
+            breakdown["asr_correction_penalty"] = round(breakdown.get("asr_correction_penalty", 0.0) + penalty, 2)
     if parsed.match_type == "fuzzy" and len(parsed.matched_keywords) > 1:
         confidence -= 0.04
         adjustments.append("多处模糊匹配降低 0.04")
+        if breakdown is not None:
+            breakdown["multi_fuzzy_penalty"] = round(breakdown.get("multi_fuzzy_penalty", 0.0) + 0.04, 2)
 
     parsed.confidence = round(max(0.0, min(confidence, 0.99)), 2)
+    if breakdown is not None:
+        breakdown["final_confidence"] = parsed.confidence
     if adjustments:
         parsed.parse_detail["confidence_adjustments"] = adjustments
 
-    if parsed.valid and parsed.confidence < 0.6:
+    if parsed.valid and parsed.confidence < LOW_CONFIDENCE_THRESHOLD:
         if parsed.intent in STATE_CHANGING_INTENTS:
             parsed.valid = False
             parsed.error_code = "LOW_CONFIDENCE_COMMAND"

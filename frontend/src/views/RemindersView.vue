@@ -4,7 +4,6 @@
       <div>
         <p class="panel-kicker">Reminder center</p>
         <h2>提醒管理</h2>
-        <p>提醒只做创建、查询、状态修改和删除，不实现系统通知或后台任务。</p>
       </div>
       <el-button class="execute-button" type="primary" @click="openCreateDialog">新建提醒</el-button>
     </section>

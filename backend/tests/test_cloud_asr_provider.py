@@ -38,7 +38,7 @@ class FakeResponse:
 
 
 class FakeClient:
-    response = FakeResponse({"transcript": "打开客厅灯", "confidence": 0.9})
+    response = FakeResponse({"transcript": "打开客厅灯"})
     error = None
     last_timeout = None
     last_url = None
@@ -62,7 +62,7 @@ class FakeClient:
 
 
 def patch_httpx_client(monkeypatch, response=None, error=None):
-    FakeClient.response = response or FakeResponse({"transcript": "打开客厅灯", "confidence": 0.9})
+    FakeClient.response = response or FakeResponse({"transcript": "打开客厅灯"})
     FakeClient.error = error
     FakeClient.last_timeout = None
     FakeClient.last_url = None
@@ -119,7 +119,7 @@ def test_cloud_timeout_returns_asr_timeout(client, auth_headers, monkeypatch):
 
 def test_cloud_empty_transcript_returns_asr_empty_transcript(client, auth_headers, monkeypatch):
     configure_cloud(monkeypatch)
-    patch_httpx_client(monkeypatch, response=FakeResponse({"transcript": "", "confidence": 0.2}))
+    patch_httpx_client(monkeypatch, response=FakeResponse({"transcript": ""}))
 
     response = client.post("/api/voice/execute", headers=auth_headers, files=audio_file())
 
@@ -170,14 +170,14 @@ def test_cloud_unsupported_audio_format_returns_asr_unsupported_audio_format(cli
 
 def test_cloud_success_uses_generic_http_request_framework(client, auth_headers, monkeypatch):
     configure_cloud(monkeypatch)
-    patch_httpx_client(monkeypatch, response=FakeResponse({"transcript": "打开客厅灯", "confidence": 0.91, "duration": 1.2}))
+    patch_httpx_client(monkeypatch, response=FakeResponse({"transcript": "打开客厅灯", "duration": 1.2}))
 
     response = client.post("/api/voice/execute", headers=auth_headers, files=audio_file())
 
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["recognition"]["provider"] == "cloud"
-    assert data["recognition"]["confidence"] == 0.91
+    assert "confidence" not in data["recognition"]
     assert data["recognition"]["duration"] == 1.2
     assert FakeClient.last_url == "https://asr.example.test/recognize"
     assert FakeClient.last_timeout == 1.0

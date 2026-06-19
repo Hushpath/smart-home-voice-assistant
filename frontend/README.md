@@ -245,7 +245,7 @@ GET /api/voice/providers
 - 链路概览
 - 语音识别信息
 - 方言容错信息
-- 指令解析信息
+- 指令解析信息，包括 Parser 置信度和 `confidence_breakdown` 分数拆解
 - 批量执行信息
 - 执行信息
 - 原始 JSON

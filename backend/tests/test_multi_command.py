@@ -93,6 +93,8 @@ def test_parse_ambiguous_batch_sub_command_marked_invalid(client, auth_headers):
     assert data["valid"] is False
     assert all(item["valid"] is False for item in data["sub_commands"])
     assert all(item["error_code"] == "AMBIGUOUS_SUB_COMMAND" for item in data["sub_commands"])
+    assert all(item["parse_detail"]["confidence_breakdown"]["ambiguity_guard_cap"] == 0.45 for item in data["sub_commands"])
+    assert all(item["parse_detail"]["confidence_breakdown"]["final_confidence"] == item["confidence"] for item in data["sub_commands"])
 
 
 def test_parse_mixed_value_commands(client, auth_headers):

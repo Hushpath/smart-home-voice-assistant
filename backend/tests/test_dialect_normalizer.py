@@ -1,10 +1,31 @@
 from app.models import CommandLog
-from app.services.command_parser import CommandParser
-from app.services.dialect_normalizer import DialectNormalizer, normalize_and_parse_command
+from app.services.command_parser import CommandParser, ParseResult
+from app.services.dialect_normalizer import DialectNormalizationResult, DialectNormalizer, _adjust_confidence, normalize_and_parse_command
 
 
 def parse(command: str):
     return normalize_and_parse_command(command, parser=CommandParser())
+
+
+def parsed_result(intent: str, confidence: float) -> ParseResult:
+    return ParseResult(
+        intent=intent,
+        valid=True,
+        message="识别成功",
+        confidence=confidence,
+        parse_detail={
+            "confidence_breakdown": {
+                "base_score": confidence,
+                "room_bonus": 0.0,
+                "device_bonus": 0.0,
+                "value_bonus": 0.0,
+                "fuzzy_penalty": 0.0,
+                "asr_correction_penalty": 0.0,
+                "multi_fuzzy_penalty": 0.0,
+                "final_confidence": confidence,
+            }
+        },
+    )
 
 
 def test_cantonese_cold_air_normalizes_to_air_conditioner():
@@ -92,6 +113,42 @@ def test_asr_corrections_and_number_conversion():
     assert "八十 -> 80" in normalization.number_conversions
     assert parsed.intent == "set_brightness"
     assert parsed.value == 80
+
+
+def test_state_changing_confidence_threshold_boundaries():
+    low = parsed_result("turn_on", 0.59)
+    _adjust_confidence(low, DialectNormalizationResult())
+    assert low.valid is False
+    assert low.error_code == "LOW_CONFIDENCE_COMMAND"
+
+    boundary = parsed_result("turn_on", 0.60)
+    _adjust_confidence(boundary, DialectNormalizationResult())
+    assert boundary.valid is True
+
+    safe = parsed_result("turn_on", 0.65)
+    _adjust_confidence(safe, DialectNormalizationResult())
+    assert safe.valid is True
+
+
+def test_readonly_low_confidence_returns_warning_without_blocking():
+    parsed = parsed_result("query_status", 0.59)
+    _adjust_confidence(parsed, DialectNormalizationResult())
+
+    assert parsed.valid is True
+    assert parsed.message == "识别成功，但置信度较低。"
+
+
+def test_asr_correction_can_drop_state_changing_command_below_threshold():
+    parsed = parsed_result("turn_on", 0.63)
+    normalization = DialectNormalizationResult(asr_corrections=["客厅等 -> 客厅灯"])
+    _adjust_confidence(parsed, normalization)
+
+    assert parsed.confidence == 0.59
+    assert parsed.valid is False
+    assert parsed.error_code == "LOW_CONFIDENCE_COMMAND"
+    breakdown = parsed.parse_detail["confidence_breakdown"]
+    assert breakdown["asr_correction_penalty"] == 0.04
+    assert breakdown["final_confidence"] == 0.59
 
 
 def test_standard_mandarin_command_still_works():

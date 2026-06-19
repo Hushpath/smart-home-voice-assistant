@@ -75,7 +75,7 @@ def test_voice_execute_log_contains_full_explainable_chain(client, auth_headers,
     assert detail["asr"]["trace_id"] == trace_id
     assert detail["asr"]["asr_provider"] == "mock"
     assert detail["asr"]["transcript"] == COMMAND_CANTONESE_AC
-    assert detail["asr"]["asr_confidence"] == 0.99
+    assert "asr_confidence" not in detail["asr"]
     assert detail["asr"]["asr_latency_ms"] is not None
     assert detail["asr"]["raw_asr_result"]["source"] == "mock"
 

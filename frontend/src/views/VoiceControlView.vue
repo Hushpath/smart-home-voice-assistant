@@ -4,7 +4,6 @@
       <div class="voice-copy">
         <p class="panel-kicker">Direct voice control</p>
         <h2>直接说出你要控制的家居动作。</h2>
-        <p>主流程只展示听取、理解、执行和反馈；识别文本、方言归一和原始 JSON 可在日志详情查看。</p>
       </div>
 
       <div class="voice-radar" :class="{ listening: activeStep === 'listening' || recording || browserListening }">
@@ -150,38 +149,41 @@
         <article v-if="lastResult" class="command-result-card direct-summary-card">
           <div class="command-result-head">
             <span>{{ lastResult.success ? '控制完成' : '控制失败' }}</span>
-            <strong>{{ safe(lastResult.message || summarizeCommandExecution(lastResult.result)) }}</strong>
+            <strong>{{ safe(resultDisplay.title) }}</strong>
           </div>
-          <div v-if="lastResult.isBatch" class="result-tags">
-            <span>批量：{{ lastResult.commandCount }} 条</span>
-            <span>成功：{{ lastResult.successCount }} 条</span>
-            <span>失败：{{ lastResult.failedCount }} 条</span>
+
+          <div v-if="resultDisplay.details.length" class="result-detail-grid">
+            <div v-for="item in resultDisplay.details" :key="item.label" :class="{ danger: item.tone === 'danger' }">
+              <label>{{ item.label }}</label>
+              <strong>{{ safe(item.value) }}</strong>
+            </div>
           </div>
-          <div v-if="lastResult.isBatch" class="batch-result-list">
-            <article v-for="item in lastResult.subResults" :key="item.index" :class="{ failed: !item.success }">
+
+          <div v-if="resultDisplay.batchItems.length" class="batch-result-list">
+            <article v-for="item in resultDisplay.batchItems" :key="item.index" :class="{ failed: !item.success }">
               <span>{{ item.index }}</span>
-              <strong>{{ safe(item.text) }}</strong>
-              <small>{{ item.success ? '成功' : '失败' }} · {{ safe(item.message) }}</small>
+              <strong>{{ safe(item.title) }}</strong>
+              <small>{{ safe(item.detail || item.sourceText || item.message) }}</small>
             </article>
           </div>
-          <div v-else-if="lastResult.parsed" class="result-tags">
-            <span>意图：{{ safe(lastResult.parsed.intent) }}</span>
-            <span>房间：{{ safe(lastResult.parsed.room) }}</span>
-            <span>设备：{{ safe(lastResult.parsed.deviceType || lastResult.parsed.device_type) }}</span>
-            <span v-if="lastResult.parsed.value !== null && lastResult.parsed.value !== undefined">
-              参数：{{ lastResult.parsed.value }}
-            </span>
-            <span v-if="lastResult.parsed.confidence !== null && lastResult.parsed.confidence !== undefined">
-              置信度：{{ lastResult.parsed.confidenceLabel }} {{ lastResult.parsed.confidencePercent }}%
-            </span>
+
+          <div v-if="resultDisplay.meta.length" class="result-tags result-meta-tags">
+            <span v-for="item in resultDisplay.meta" :key="item.label">{{ item.label }}：{{ safe(item.value) }}</span>
           </div>
-          <p v-if="lastResult.parsed?.confidence !== null && lastResult.parsed?.confidence < 0.6" class="result-warning">
+
+          <p v-if="lastResult.parsed?.confidence !== null && lastResult.parsed?.confidence < LOW_CONFIDENCE_THRESHOLD" class="result-warning">
             系统不太确定你的指令含义，请换一种更明确的说法。
           </p>
-          <div v-if="lastResult.deviceBefore || lastResult.deviceAfter" class="state-diff">
-            <span>执行前：{{ formatDeviceState(lastResult.deviceBefore || {}) }}</span>
-            <span>执行后：{{ formatDeviceState(lastResult.deviceAfter || {}) }}</span>
+
+          <div v-if="resultDisplay.changes.length" class="state-change-list">
+            <article v-for="item in resultDisplay.changes" :key="item.label">
+              <label>{{ item.label }}</label>
+              <span>{{ safe(item.before) }}</span>
+              <strong>{{ safe(item.after) }}</strong>
+            </article>
           </div>
+          <p v-else-if="resultDisplay.noChangeText" class="state-no-change">{{ resultDisplay.noChangeText }}</p>
+
           <div class="summary-actions">
             <el-button link type="primary" :disabled="!lastTraceId" @click="openLogDetail">查看日志详情</el-button>
           </div>
@@ -271,14 +273,15 @@ import { getCommandLogsApi, executeCommandApi } from '../api/command'
 import { getDevicesApi } from '../api/device'
 import { clearAsrConfigApi, executeVoiceAudioApi, getAsrConfigApi, getVoiceProvidersApi, saveAsrConfigApi } from '../api/voice'
 import {
+  buildAssistantSpeech,
+  buildCommandResultDisplay,
   cleanText,
-  formatDeviceState,
+  LOW_CONFIDENCE_THRESHOLD,
   normalizeCommandLog,
   normalizeCommandResult,
   normalizeDevice,
   normalizeVoiceExecuteResult,
   normalizeVoiceProviderStatus,
-  summarizeCommandExecution
 } from '../utils/normalizers'
 
 const router = useRouter()
@@ -363,6 +366,7 @@ const flowSteps = computed(() => {
 })
 
 const lastTraceId = computed(() => lastResult.value?.traceId || recentLogs.value[0]?.traceId || '')
+const resultDisplay = computed(() => buildCommandResultDisplay(lastResult.value || {}))
 
 const cloudModeHelp = computed(() => {
   if (!providerStatus.value.cloudConfigured) return '云端语音识别未配置，请切换到浏览器识别或文本输入。'
@@ -607,7 +611,7 @@ async function executeCloudAudio(blob) {
       suppressErrorMessage: true
     })
     lastResult.value = normalizeVoiceExecuteResult(response)
-    finishRun(response.message || lastResult.value.message || '控制完成', lastResult.value.success)
+    finishRun(speechSummary(lastResult.value, response.message), lastResult.value.success)
   } catch (error) {
     failRun(friendlyError(error, 'cloud'), 'cloud')
   } finally {
@@ -674,6 +678,8 @@ function createRecognition() {
   instance.onerror = (event) => {
     if (browserFinalized.value) return
     if (browserStopRequested.value && event?.error === 'aborted') return
+    browserFinalized.value = true
+    browserStopRequested.value = false
     browserListening.value = false
     clearBrowserStopTimer()
     failRun('浏览器语音识别失败，请使用文本输入。')
@@ -737,7 +743,7 @@ async function executeTextCommand(command, source) {
       suppressErrorMessage: true
     })
     lastResult.value = normalizeCommandResult(response)
-    finishRun(response.message || lastResult.value.message || '控制完成', lastResult.value.success)
+    finishRun(speechSummary(lastResult.value, response.message), lastResult.value.success)
   } catch (error) {
     failRun(friendlyError(error, source), source)
   } finally {
@@ -768,7 +774,7 @@ function failRun(message, source = currentInputSource.value) {
   activeStep.value = 'error'
   lastResult.value = null
   lastError.value = { message: displayMessage, suggestion: fallbackSuggestion(displayMessage, source) }
-  if (source !== 'text') ElMessage.warning(displayMessage)
+  ElMessage.warning(displayMessage)
   speak(displayMessage)
   busy.value = false
 }
@@ -781,13 +787,17 @@ function showFriendlyError(message, source = currentInputSource.value) {
   speak(displayMessage)
 }
 
+function speechSummary(result, fallback = '') {
+  return buildAssistantSpeech(result) || fallback || result?.message || '控制完成'
+}
+
 function friendlyError(error, source = currentInputSource.value) {
   const code = error.payload?.code
   if (code === 'ASR_PROVIDER_NOT_CONFIGURED' || code === 'ASR_NOT_CONFIGURED') return '云端语音识别未配置，请使用浏览器识别或文本输入。'
   if (code === 'ASR_TIMEOUT') return '云端语音识别请求超时，请使用浏览器识别或文本输入。'
-  if (code === 'ASR_AUTH_FAILED') return '云端语音识别认证失败，请检查后端配置或使用兜底输入。'
+  if (code === 'ASR_AUTH_FAILED') return '云端语音识别认证失败，请检查后端配置或使用文本输入。'
   if (code === 'ASR_EMPTY_TRANSCRIPT') return '云端语音识别没有返回有效文本，请使用浏览器识别或文本输入。'
-  if (code === 'ASR_INVALID_RESPONSE' || code === 'ASR_REQUEST_FAILED') return '云端语音识别调用失败，请稍后重试或使用兜底输入。'
+  if (code === 'ASR_INVALID_RESPONSE' || code === 'ASR_REQUEST_FAILED') return '云端语音识别失败，请使用文本输入。'
   if (code === 'ASR_UNSUPPORTED_AUDIO_FORMAT') return '当前录音格式暂不支持，请使用浏览器识别或文本输入。'
   if (code === 'ASR_EMPTY_AUDIO') return '录音内容为空，请重新录制。'
   if (code === 'UNAUTHORIZED') return '登录已失效，请重新登录。'

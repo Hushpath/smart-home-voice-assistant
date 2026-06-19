@@ -318,7 +318,7 @@ wss://iat-api.xfyun.cn/v2/iat
 - 请求路径和参数字段。
 - 官方签名算法。
 - 鉴权头或 token 获取方式。
-- 响应字段映射到 `transcript`、`confidence`、`duration`。
+- 响应字段映射到 `transcript`、`duration`。
 - 厂商错误码到本项目统一错误码的映射。
 
 `MockASRProvider` 只能通过测试或本地开发显式启用，不作为前端可选识别方式。
@@ -334,7 +334,7 @@ ASR transcript / 浏览器识别文本 / 文本输入
 -> CommandExecutor
 ```
 
-`DialectNormalizer` 只做文本归一和过程记录，不直接决定业务执行。输出会保留 `original_text`、`normalized_text`、`detected_dialect`、`dialect_matches`、`asr_corrections`、`removed_fillers`、`number_conversions` 和 `normalization_steps`。
+`DialectNormalizer` 只做文本归一和过程记录，不直接决定业务执行。输出会保留 `original_text`、`normalized_text`、`detected_dialect`、`dialect_matches`、识别文本纠错记录 `asr_corrections`、`removed_fillers`、`number_conversions` 和 `normalization_steps`。
 
 后端内部支持 `auto`、`mandarin`、`cantonese`、`southwest`、`northeast`。默认 `auto`：命中 `冷气`、`声量`、`熄灯`、`睇下`、`食药`、`瞓觉`、`返屋企` 等识别为粤语；命中 `开哈`、`关哈` 识别为西南口音；命中 `开开`、`关上` 识别为东北/北方口语；其他情况按普通话处理。
 
@@ -351,9 +351,9 @@ ASR transcript / 浏览器识别文本 / 文本输入
 - 西南口音：`开哈 -> 打开`，`关哈 -> 关闭`，`整到/整成 -> 设置`，`冷气 -> 空调`。
 - 东北/北方口语：`开开 -> 打开`，`关上 -> 关闭`，`整到 -> 设置`，`整亮点 -> 设置亮度`。
 
-ASR 常见错词纠正包括：`客厅等 -> 客厅灯`、`卧室等 -> 卧室灯`、`空条/空跳 -> 空调`、`电视及 -> 电视机`、`音凉 -> 音量`、`两度 -> 亮度`、`二十留 -> 二十六`。中文数字转换复用现有指令解析中的中文数字逻辑，例如 `三十 -> 30`、`八十 -> 80`、`二十六 -> 26`、`晚上八点 -> 20:00`。
+识别文本常见错词纠正包括：`客厅等 -> 客厅灯`、`卧室等 -> 卧室灯`、`空条/空跳 -> 空调`、`电视及 -> 电视机`、`音凉 -> 音量`、`两度 -> 亮度`、`二十留 -> 二十六`。中文数字转换复用现有指令解析中的中文数字逻辑，例如 `三十 -> 30`、`八十 -> 80`、`二十六 -> 26`、`晚上八点 -> 20:00`。
 
-置信度处理：ASR 错词纠正后仍继续解析，但会轻微降低 `confidence`，并把 `match_type` 标记为 `fuzzy`；多处模糊匹配会继续降低 `confidence`；低于 `0.6` 的设备控制、场景执行、提醒创建等会改变状态的指令不会执行；查询天气、查询状态等只读操作可以返回结果但提示置信度较低。当前不做低置信度二次确认机制。
+Parser 置信度处理：识别文本纠错后仍继续解析，但会轻微降低解析结果的 `confidence`，并把 `match_type` 标记为 `fuzzy`；多处模糊匹配会继续降低 `confidence`；低于 `LOW_CONFIDENCE_THRESHOLD = 0.6` 的设备控制、场景执行、提醒创建等会改变状态的指令不会执行；查询天气、查询状态等只读操作可以返回结果但提示置信度较低。当前不做低置信度二次确认机制。
 
 当前限制：方言词典是规则式轻量词典，不覆盖所有真实方言表达；未训练或微调语音识别模型；未接入真实智能家居硬件；暂未把方言模式暴露到前端主界面，默认使用 `auto`。
 
@@ -381,8 +381,8 @@ trace_id
 
 `detail` 按链路分块：
 
-- `asr`：输入来源、ASR provider、transcript、ASR 置信度、音频时长、ASR 耗时和 raw ASR 结果。
-- `normalization`：检测到的方言、标准化文本、方言词典命中、ASR 错词纠正、中文数字转换、过滤口语词和步骤记录。
+- `asr`：输入来源、ASR provider、transcript、音频时长、ASR 耗时和 raw ASR 结果。
+- `normalization`：检测到的方言、标准化文本、方言词典命中、识别文本纠错、中文数字转换、过滤口语词和步骤记录。
 - `parse`：意图、房间、设备、参数、场景、提醒、天气、意图打分、解析置信度、关键词和匹配方式。
 - `execution`：成功状态、code、message、设备前后状态、影响设备、错误信息和执行耗时。
 - `batch`：批量指令的拆分策略、子指令列表、子执行结果、成功数和失败数。
@@ -555,13 +555,14 @@ trace_id
 置信度说明：
 
 - `confidence` 范围为 `0-1`，由意图分数、房间匹配、设备匹配、参数明确性和模糊匹配惩罚综合计算。
+- `parse_detail.confidence_breakdown` 记录 `base_score`、房间/设备/参数加分、模糊匹配扣分、识别文本纠错扣分和最终置信度，便于解释分数来源。
 - `0.80-1.00` 为高置信度，`0.60-0.79` 为中置信度，低于 `0.60` 视为低置信度。
 - 低置信度设备控制类指令不会执行，并提示用户换一种说法或使用文本输入。
 
 前端展示策略：
 
 - 语音控制页展示简化摘要：意图、房间、设备、参数、置信度、执行前后状态。
-- 操作日志页通过“详情”查看完整解析过程，包括 `intent_scores`、匹配关键词、房间/设备匹配、参数抽取和 raw JSON。
+- 操作日志页通过“详情”查看完整解析过程，包括 `intent_scores`、`confidence_breakdown`、匹配关键词、房间/设备匹配、参数抽取和 raw JSON；`confidence_breakdown` 会以基础分、加分项、扣分项和最终置信度展示。
 
 ## 中文指令执行
 
@@ -680,7 +681,7 @@ trace_id
 - 请求参数校验和未知路径的统一错误返回。
 - 云端 ASR 配置状态、未配置错误、超时、认证失败、空文本、非法响应和不支持音频格式。
 - Mock ASR 测试路径、`/api/voice/providers`、`/api/voice/recognize`、`/api/voice/execute`。
-- 方言/口音容错，包括粤语词典、西南/东北轻量口音、ASR 错词纠正和中文数字转换。
+- 方言/口音容错，包括粤语词典、西南/东北轻量口音、识别文本纠错和中文数字转换。
 - 操作日志详情，包括 `trace_id`、ASR 信息、方言归一、解析结果、执行结果和避免重复日志。
 
 ## Smoke Test

@@ -40,11 +40,11 @@
 ## 指令解析流程
 
 1. 输入来源可以是云端 ASR transcript、浏览器 Web Speech API 识别文本或文本输入。
-2. `DialectNormalizer` 对方言词汇、粤语词、ASR 常见错词、口语词和中文数字做归一，并保留 normalization detail。
+2. `DialectNormalizer` 对方言词汇、粤语词、识别文本常见错词、口语词和中文数字做归一，并保留 normalization detail。
 3. `MultiCommandParser` 对常见多指令句式做规则拆分和上下文继承，例如“打开客厅灯和空调”“打开卧室空调并调到26度”。
 4. 拆分后的单条文本交给 `CommandParser`，对动作词、设备词、房间词、参数词、场景/天气/提醒关键词做意图打分。
 5. 房间和设备先做精确匹配，再做别名匹配，最后用 `difflib.SequenceMatcher` 做轻量模糊匹配。
-6. 解析成功返回 `intent`、`room`、`device_type`、`value`、`scene`、`reminder_time`、`reminder_content`、`city`、`confidence`、`matched_keywords`、`match_type` 和 `parse_detail` 等结构化字段。
+6. 解析成功返回 `intent`、`room`、`device_type`、`value`、`scene`、`reminder_time`、`reminder_content`、`city`、`confidence`、`matched_keywords`、`match_type` 和 `parse_detail` 等结构化字段；`parse_detail.confidence_breakdown` 用于解释 Parser 置信度来源。
 7. 批量解析返回 `is_batch`、`command_count` 和 `sub_commands`；歧义子指令会标记 `valid=false`，避免误执行。
 8. 低置信度设备控制类指令返回明确提示，不执行设备控制。
 9. 解析失败返回统一错误码 `INVALID_COMMAND`。
@@ -70,7 +70,7 @@
 - 中文指令解析覆盖开关、温度、亮度、音量、状态查询、场景、提醒和天气。
 - 方言/口音容错覆盖粤语重点词、西南和东北/北方口语、中文数字参数、设备别名和少量识别误差。
 - 多指令解析覆盖常见连接词、上下文继承、部分成功和歧义子指令保护。
-- 解析结果包含 `confidence`、`intent_scores`、关键词匹配和参数抽取详情。
+- 解析结果包含 `confidence`、`confidence_breakdown`、`intent_scores`、关键词匹配和参数抽取详情。
 - 中文指令、语音指令和批量指令执行后写入 `command_logs`，日志详情包含 `trace_id`、ASR、normalization、parse、batch 和 execution 信息。
 - 设备控制指令写入 `device_status_history`。
 - 温度、亮度、音量越界返回 `VALUE_OUT_OF_RANGE`。

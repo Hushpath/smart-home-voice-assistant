@@ -35,7 +35,6 @@
         <div class="detail-kv-grid">
           <div><label>ASR provider</label><strong>{{ value(asr.asr_provider) }}</strong></div>
           <div><label>transcript</label><strong>{{ value(asr.transcript) }}</strong></div>
-          <div><label>ASR 置信度</label><strong>{{ percent(asr.asr_confidence) }}</strong></div>
           <div><label>音频时长</label><strong>{{ seconds(asr.audio_duration) }}</strong></div>
           <div><label>ASR 耗时</label><strong>{{ milliseconds(asr.asr_latency_ms) }}</strong></div>
         </div>
@@ -48,7 +47,7 @@
           <div><label>detected_dialect</label><strong>{{ value(normalization.detected_dialect) }}</strong></div>
           <div><label>normalized_text</label><strong>{{ value(normalization.normalized_text) }}</strong></div>
           <div><label>dialect_matches</label><strong>{{ list(normalization.dialect_matches) }}</strong></div>
-          <div><label>asr_corrections</label><strong>{{ list(normalization.asr_corrections) }}</strong></div>
+          <div><label>识别文本纠错</label><strong>{{ list(normalization.asr_corrections) }}</strong></div>
           <div><label>number_conversions</label><strong>{{ list(normalization.number_conversions) }}</strong></div>
           <div><label>removed_fillers</label><strong>{{ list(normalization.removed_fillers) }}</strong></div>
         </div>
@@ -69,6 +68,19 @@
           <div><label>parser_confidence</label><strong>{{ percent(parse.parser_confidence) }}</strong></div>
           <div><label>match_type</label><strong>{{ value(parse.match_type) }}</strong></div>
           <div><label>matched_keywords</label><strong>{{ list(parse.matched_keywords) }}</strong></div>
+        </div>
+        <div v-if="hasConfidenceBreakdown" class="detail-kv-grid">
+          <div><label>基础分</label><strong>{{ percent(confidenceBreakdown.base_score) }}</strong></div>
+          <div><label>房间加分</label><strong>{{ signedPercent(confidenceBreakdown.room_bonus) }}</strong></div>
+          <div><label>设备加分</label><strong>{{ signedPercent(confidenceBreakdown.device_bonus) }}</strong></div>
+          <div><label>参数加分</label><strong>{{ signedPercent(confidenceBreakdown.value_bonus) }}</strong></div>
+          <div><label>模糊匹配扣分</label><strong>{{ penaltyPercent(confidenceBreakdown.fuzzy_penalty) }}</strong></div>
+          <div><label>识别文本纠错扣分</label><strong>{{ penaltyPercent(confidenceBreakdown.asr_correction_penalty) }}</strong></div>
+          <div><label>多处模糊扣分</label><strong>{{ penaltyPercent(confidenceBreakdown.multi_fuzzy_penalty) }}</strong></div>
+          <div v-if="confidenceBreakdown.ambiguity_guard_cap !== undefined">
+            <label>歧义保护上限</label><strong>{{ percent(confidenceBreakdown.ambiguity_guard_cap) }}</strong>
+          </div>
+          <div><label>最终置信度</label><strong>{{ percent(confidenceBreakdown.final_confidence) }}</strong></div>
         </div>
         <JsonBlock title="intent_scores" :value="parse.intent_scores" />
       </section>
@@ -127,6 +139,8 @@ defineEmits(['update:modelValue'])
 const asr = computed(() => props.log?.detail?.asr || {})
 const normalization = computed(() => props.log?.detail?.normalization || {})
 const parse = computed(() => props.log?.detail?.parse || {})
+const confidenceBreakdown = computed(() => parse.value?.confidence_breakdown || {})
+const hasConfidenceBreakdown = computed(() => Object.keys(confidenceBreakdown.value).length > 0)
 const execution = computed(() => props.log?.detail?.execution || {})
 const batch = computed(() => props.log?.detail?.batch || {})
 const JsonBlock = {
@@ -164,6 +178,18 @@ function list(items) {
 
 function percent(item) {
   return typeof item === 'number' ? `${Math.round(item * 100)}%` : '-'
+}
+
+function signedPercent(item) {
+  if (typeof item !== 'number') return '-'
+  if (item === 0) return '0%'
+  return `+${Math.round(item * 100)}%`
+}
+
+function penaltyPercent(item) {
+  if (typeof item !== 'number') return '-'
+  if (item === 0) return '0%'
+  return `-${Math.round(item * 100)}%`
 }
 
 function seconds(item) {

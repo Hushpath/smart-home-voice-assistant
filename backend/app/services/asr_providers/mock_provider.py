@@ -34,7 +34,6 @@ class MockASRProvider(ASRProvider):
         return ASRRecognitionResult(
             provider=self.name,
             transcript=transcript,
-            confidence=0.99,
             duration=0.0,
             latency_ms=latency_ms,
             dialect=dialect,

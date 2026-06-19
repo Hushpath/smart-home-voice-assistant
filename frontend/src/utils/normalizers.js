@@ -1,3 +1,5 @@
+export const LOW_CONFIDENCE_THRESHOLD = 0.6
+
 export function normalizeDevice(device = {}) {
   const properties = device.properties || {}
   return {
@@ -95,6 +97,7 @@ export function normalizeLogDetail(detail = {}, parsedResult = {}, executionResu
       reminder_content: parsedResult.reminderContent || parsedResult.reminder_content,
       city: parsedResult.city,
       intent_scores: parseDetail.intent_scores,
+      confidence_breakdown: parseDetail.confidence_breakdown,
       parser_confidence: parsedResult.confidence,
       matched_keywords: parsedResult.matchedKeywords || parsedResult.matched_keywords || [],
       match_type: parsedResult.matchType || parsedResult.match_type,
@@ -260,7 +263,7 @@ export function normalizeParsedCommand(parsed = {}) {
 export function getConfidenceLabel(confidence) {
   if (confidence === null || confidence === undefined) return '-'
   if (confidence >= 0.8) return '高'
-  if (confidence >= 0.6) return '中'
+  if (confidence >= LOW_CONFIDENCE_THRESHOLD) return '中'
   return '低'
 }
 
@@ -333,37 +336,447 @@ export function formatDateTime(value) {
   })
 }
 
+export function buildAssistantSpeech(commandResult = {}) {
+  if (!commandResult || typeof commandResult !== 'object') return ''
+  const data = commandResult.data || commandResult
+  if (data.is_batch || data.isBatch) {
+    const subResults = data.sub_results || data.subResults || []
+    const sentences = subResults
+      .map((item) => buildAssistantSpeechForSingle(item))
+      .filter(Boolean)
+    if (sentences.length) return joinSpeechSentences(sentences)
+    return `已为你处理 ${data.command_count ?? data.commandCount ?? 0} 条指令`
+  }
+  return buildAssistantSpeechForSingle(data)
+}
+
+function buildAssistantSpeechForSingle(item = {}) {
+  if (!item || typeof item !== 'object') return ''
+  if (item.success === false) return buildFailureSpeech(item)
+
+  const result = item.result || item
+  const parsed = item.parsed || {}
+  const intent = parsed.intent
+  const deviceName = getAssistantDeviceName(item, result, parsed)
+  const deviceAfter = item.device_after || item.deviceAfter || result.after_state || result.afterState || {}
+  const properties = deviceAfter.properties || result.device?.properties || {}
+
+  if (intent === 'turn_on') return `已为你打开${deviceName}`
+  if (intent === 'turn_off') return `已为你关闭${deviceName}`
+  if (intent === 'set_temperature') {
+    const value = parsed.value ?? properties.temperature
+    return `已将${deviceName}调到${value}度`
+  }
+  if (intent === 'set_brightness') {
+    const value = parsed.value ?? properties.brightness
+    return `已将${deviceName}亮度调到${value}%`
+  }
+  if (intent === 'set_volume') {
+    const value = parsed.value ?? properties.volume
+    return `已将${deviceName}音量调到${value}`
+  }
+  if (intent === 'run_scene') {
+    const scene = item.scene || result.scene || {}
+    return `已为你开启${scene.name || parsed.scene || '场景'}`
+  }
+  if (intent === 'create_reminder') {
+    const reminder = item.reminder || result.reminder || {}
+    const content = parsed.reminderContent || parsed.reminder_content || reminder.title || reminder.reminder_content || '这件事'
+    const timeText = getReminderSpeechTime(parsed, reminder)
+    return timeText ? `${timeText}会提醒你${content}` : `会提醒你${content}`
+  }
+  if (intent === 'query_weather') {
+    const weather = item.weather || result.weather || {}
+    const temperature = weather.temperature !== undefined ? `，${weather.temperature}度` : ''
+    return `${weather.city || parsed.city || '本地'}今天${weather.weather || '天气信息已更新'}${temperature}`
+  }
+  if (intent === 'query_status' && result.devices) {
+    return `查询到${result.devices.length}台设备`
+  }
+
+  const summary = summarizeCommandExecution(item)
+  return summary === '无执行结果' ? item.message || '' : summary
+}
+
+function buildFailureSpeech(item = {}) {
+  const text = cleanText(item.text || item.parsed?.originalText || item.parsed?.normalizedText || '这条指令', '')
+  const code = item.code || item.error_code
+  const message = cleanText(item.message || item.error_message, '')
+  if (['ROOM_NOT_FOUND', 'DEVICE_NOT_FOUND', 'AMBIGUOUS_SUB_COMMAND'].includes(code)) {
+    return `${text}没有执行成功，请检查房间或设备名称`
+  }
+  return message ? `${text}没有执行成功，${message}` : `${text}没有执行成功`
+}
+
+function getAssistantDeviceName(item = {}, result = {}, parsed = {}) {
+  const device = result.device || item.affectedDevices?.[0] || item.affected_devices?.[0] || {}
+  const name = cleanText(device.name, '')
+  const roomName = cleanText(device.room_name || device.roomName || parsed.room, '')
+  if (name && roomName && !name.includes(roomName)) return `${roomName}${name}`
+  if (name) return name
+  return `${roomName}${getAssistantDeviceTypeLabel(parsed.deviceType || parsed.device_type)}`
+}
+
+function getAssistantDeviceTypeLabel(type) {
+  const typeMap = {
+    light: '灯',
+    air_conditioner: '空调',
+    tv: '电视',
+    curtain: '窗帘',
+    fan: '排风扇'
+  }
+  return typeMap[type] || getDeviceTypeLabel(type)
+}
+
+function getReminderSpeechTime(parsed = {}, reminder = {}) {
+  const extracted = extractReminderTimeText(parsed)
+  if (extracted) return extracted
+  const value = parsed.reminderTime || parsed.reminder_time || reminder.remind_time
+  if (!value) return ''
+  const timeMatch = String(value).match(/(\d{1,2}):(\d{2})/)
+  if (!timeMatch) return String(value)
+  return formatSpeechClock(Number(timeMatch[1]), Number(timeMatch[2]))
+}
+
+function extractReminderTimeText(parsed = {}) {
+  const content = parsed.reminderContent || parsed.reminder_content
+  const source = cleanText(parsed.originalText || parsed.original_text || parsed.normalizedText || parsed.normalized_text, '')
+  if (!content || !source || !source.includes(content)) return ''
+  const beforeContent = source.split(content)[0]
+    .replace(/.*?提醒我/, '')
+    .replace(/^(请|帮我|麻烦|到时候|在)/, '')
+    .trim()
+  return beforeContent || ''
+}
+
+function formatSpeechClock(hour, minute) {
+  const period =
+    hour >= 18 ? '晚上' :
+      hour >= 12 ? '下午' :
+        hour >= 6 ? '早上' : '凌晨'
+  const displayHour = hour > 12 ? hour - 12 : hour
+  const minuteText = minute ? `${numberToChinese(minute)}分` : ''
+  return `${period}${numberToChinese(displayHour)}点${minuteText}`
+}
+
+function numberToChinese(value) {
+  const digits = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九']
+  if (value <= 10) return value === 10 ? '十' : digits[value]
+  if (value < 20) return `十${digits[value - 10]}`
+  const ten = Math.floor(value / 10)
+  const one = value % 10
+  return `${digits[ten]}十${one ? digits[one] : ''}`
+}
+
+function joinSpeechSentences(sentences = []) {
+  return sentences
+    .map((sentence) => String(sentence).replace(/[。.!！]+$/g, ''))
+    .filter(Boolean)
+    .join('。')
+}
+
+export function buildCommandResultDisplay(commandResult = {}) {
+  if (!commandResult || typeof commandResult !== 'object') return emptyCommandDisplay()
+  const data = commandResult.data || commandResult
+  if (data.is_batch || data.isBatch) return buildBatchDisplay(data)
+  return buildSingleDisplay(data)
+}
+
+function buildBatchDisplay(data = {}) {
+  const subResults = data.sub_results || data.subResults || []
+  const successCount = data.success_count ?? data.successCount ?? subResults.filter((item) => item.success).length
+  const failedCount = data.failed_count ?? data.failedCount ?? subResults.filter((item) => item.success === false).length
+  const commandCount = data.command_count ?? data.commandCount ?? subResults.length
+  const items = subResults.map((item) => {
+    const display = buildSingleDisplay(item)
+    return {
+      index: item.index,
+      success: item.success !== false,
+      sourceText: cleanText(item.text || item.parsed?.originalText || item.parsed?.normalizedText, ''),
+      title: display.title,
+      detail: display.details.map((detail) => `${detail.label} ${detail.value}`).join(' · ') || cleanText(item.message, ''),
+      message: cleanText(item.message, '')
+    }
+  })
+  const title = failedCount
+    ? `已完成 ${successCount} 条，${failedCount} 条未完成`
+    : `已完成 ${commandCount} 条指令`
+  return {
+    title,
+    details: [
+      { label: '指令总数', value: `${commandCount} 条` },
+      { label: '成功', value: `${successCount} 条` },
+      { label: '未完成', value: `${failedCount} 条`, tone: failedCount ? 'danger' : '' }
+    ],
+    meta: [{ label: '识别类型', value: '批量指令' }],
+    changes: [],
+    noChangeText: '',
+    batchItems: items
+  }
+}
+
+function buildSingleDisplay(item = {}) {
+  if (!item || typeof item !== 'object') return emptyCommandDisplay()
+  if (item.success === false) return buildFailedDisplay(item)
+
+  const result = item.result || item
+  const parsed = item.parsed || {}
+  const intent = parsed.intent
+  const details = []
+  const deviceName = getAssistantDeviceName(item, result, parsed)
+  const deviceBefore = item.device_before || item.deviceBefore || result.before_state || result.beforeState || null
+  const deviceAfter = item.device_after || item.deviceAfter || result.after_state || result.afterState || null
+  const changes = buildStateChangeRows(deviceBefore, deviceAfter)
+  const title = buildDisplayTitle(item, result, parsed, deviceName)
+
+  if (['turn_on', 'turn_off', 'set_temperature', 'set_brightness', 'set_volume'].includes(intent)) {
+    addDetail(details, '设备', deviceName)
+    addDeviceStateDetails(details, intent, deviceAfter, result.device?.properties || {})
+  } else if (intent === 'query_status') {
+    const devices = result.devices || []
+    addDetail(details, '范围', parsed.room || '全部房间')
+    addDetail(details, '设备数量', `${devices.length} 台`)
+    addDetail(details, '设备', compactDeviceNames(devices))
+  } else if (intent === 'run_scene') {
+    const scene = item.scene || result.scene || {}
+    const changesCount = (result.changes || []).length
+    addDetail(details, '场景', scene.name || parsed.scene)
+    addDetail(details, '影响设备', `${changesCount} 台`)
+    addDetail(details, '设备', compactDeviceNames((result.changes || []).map((change) => change.device).filter(Boolean)))
+  } else if (intent === 'create_reminder') {
+    const reminder = item.reminder || result.reminder || {}
+    addDetail(details, '内容', parsed.reminderContent || parsed.reminder_content || reminder.title || reminder.reminder_content)
+    addDetail(details, '时间', formatReminderDisplayTime(parsed, reminder))
+  } else if (intent === 'query_weather') {
+    const weather = item.weather || result.weather || {}
+    addDetail(details, '城市', weather.city || parsed.city || '本地')
+    addDetail(details, '天气', weather.weather)
+    addDetail(details, '温度', weather.temperature !== undefined ? `${weather.temperature} 度` : '')
+    addDetail(details, '湿度', weather.humidity !== undefined ? `${weather.humidity}%` : '')
+    addDetail(details, '建议', weather.advice)
+  } else {
+    addDetail(details, '结果', summarizeCommandExecution(item))
+  }
+
+  return {
+    title,
+    details,
+    meta: buildResultMeta(parsed),
+    changes,
+    noChangeText: !changes.length && (deviceBefore || deviceAfter) ? '设备原本已是目标状态' : '',
+    batchItems: []
+  }
+}
+
+function buildFailedDisplay(item = {}) {
+  const parsed = item.parsed || {}
+  const text = cleanText(item.text || parsed.originalText || parsed.normalizedText || '这条指令', '')
+  return {
+    title: text ? `${text}没有执行成功` : '指令没有执行成功',
+    details: [{ label: '原因', value: cleanText(item.message || item.error_message || '请检查指令内容', '') }],
+    meta: buildResultMeta(parsed),
+    changes: [],
+    noChangeText: '',
+    batchItems: []
+  }
+}
+
+function buildDisplayTitle(item = {}, result = {}, parsed = {}, deviceName = '') {
+  const intent = parsed.intent
+  const deviceAfter = item.device_after || item.deviceAfter || result.after_state || result.afterState || {}
+  const properties = deviceAfter.properties || result.device?.properties || {}
+  if (intent === 'turn_on') return `已打开${deviceName}`
+  if (intent === 'turn_off') return `已关闭${deviceName}`
+  if (intent === 'set_temperature') return `已将${deviceName}调到 ${parsed.value ?? properties.temperature} 度`
+  if (intent === 'set_brightness') return `已将${deviceName}亮度调到 ${parsed.value ?? properties.brightness}%`
+  if (intent === 'set_volume') return `已将${deviceName}音量调到 ${parsed.value ?? properties.volume}`
+  if (intent === 'query_status') return `${parsed.room || '全部房间'}设备状态已查询`
+  if (intent === 'run_scene') {
+    const scene = item.scene || result.scene || {}
+    return `${scene.name || parsed.scene || '场景'}已执行，影响 ${(result.changes || []).length} 台设备`
+  }
+  if (intent === 'create_reminder') {
+    const reminder = item.reminder || result.reminder || {}
+    const content = parsed.reminderContent || parsed.reminder_content || reminder.title || reminder.reminder_content || '提醒'
+    return `已设置提醒：${content}`
+  }
+  if (intent === 'query_weather') {
+    const weather = item.weather || result.weather || {}
+    const temperature = weather.temperature !== undefined ? `，${weather.temperature} 度` : ''
+    return `${weather.city || parsed.city || '本地'}今天${weather.weather || '天气已更新'}${temperature}`
+  }
+  return summarizeCommandExecution(item)
+}
+
+function buildResultMeta(parsed = {}) {
+  const meta = []
+  addDetail(meta, '识别类型', getIntentLabel(parsed.intent))
+  addDetail(meta, '位置', parsed.room)
+  const deviceType = parsed.deviceType || parsed.device_type
+  if (deviceType) addDetail(meta, '设备', getAssistantDeviceTypeLabel(deviceType))
+  if (parsed.confidence !== null && parsed.confidence !== undefined) {
+    addDetail(meta, '置信度', `${parsed.confidenceLabel || getConfidenceLabel(parsed.confidence)} ${Math.round(parsed.confidence * 100)}%`)
+  }
+  return meta
+}
+
+function addDeviceStateDetails(details, intent, state = {}, fallbackProperties = {}) {
+  const properties = state?.properties || fallbackProperties || {}
+  if (state?.is_on !== undefined) addDetail(details, '开关', state.is_on ? '开启' : '关闭')
+  if (intent === 'set_temperature' || properties.temperature !== undefined) addDetail(details, '温度', formatPropertyValue('temperature', properties.temperature))
+  if (intent === 'set_brightness' || properties.brightness !== undefined) addDetail(details, '亮度', formatPropertyValue('brightness', properties.brightness))
+  if (intent === 'set_volume' || properties.volume !== undefined) addDetail(details, '音量', formatPropertyValue('volume', properties.volume))
+  addDetail(details, '模式', properties.mode)
+  addDetail(details, '风量', properties.fan_speed)
+  addDetail(details, '频道', properties.channel)
+  addDetail(details, '开合', formatPropertyValue('open_percent', properties.open_percent))
+  addDetail(details, '风速', properties.speed)
+  addDetail(details, '色温', properties.color_temperature)
+}
+
+function buildStateChangeRows(before = null, after = null) {
+  if (!before || !after) return []
+  const rows = []
+  addChange(rows, '开关', before.is_on, after.is_on, (value) => value ? '开启' : '关闭')
+  addChange(rows, '在线', before.is_online, after.is_online, (value) => value ? '在线' : '离线')
+  const beforeProperties = before.properties || {}
+  const afterProperties = after.properties || {}
+  const keys = Array.from(new Set([...Object.keys(beforeProperties), ...Object.keys(afterProperties)]))
+  keys.forEach((key) => {
+    addChange(rows, getPropertyLabel(key), beforeProperties[key], afterProperties[key], (value) => formatPropertyValue(key, value))
+  })
+  return rows
+}
+
+function addChange(rows, label, before, after, formatter = (value) => value) {
+  if (before === after || before === undefined && after === undefined) return
+  rows.push({
+    label,
+    before: before === undefined ? '未设置' : formatter(before),
+    after: after === undefined ? '未设置' : formatter(after)
+  })
+}
+
+function addDetail(list, label, value, tone = '') {
+  if (value === null || value === undefined || value === '' || value === '-') return
+  list.push({ label, value, tone })
+}
+
+function compactDeviceNames(devices = []) {
+  const names = devices
+    .map((device) => {
+      const roomName = cleanText(device.room_name || device.roomName, '')
+      const name = cleanText(device.name, '')
+      if (roomName && name && !name.includes(roomName)) return `${roomName}${name}`
+      return name
+    })
+    .filter(Boolean)
+  if (!names.length) return ''
+  if (names.length <= 3) return names.join('、')
+  return `${names.slice(0, 3).join('、')} 等 ${names.length} 台`
+}
+
+function formatReminderDisplayTime(parsed = {}, reminder = {}) {
+  const extracted = extractReminderTimeText(parsed)
+  if (extracted) return extracted
+  const value = parsed.reminderTime || parsed.reminder_time || reminder.remind_time
+  return value ? formatDateTime(value) : ''
+}
+
+function formatPropertyValue(key, value) {
+  if (value === null || value === undefined || value === '') return ''
+  if (key === 'temperature') return `${value}℃`
+  if (key === 'brightness' || key === 'open_percent') return `${value}%`
+  return value
+}
+
+function getPropertyLabel(key) {
+  const labels = {
+    temperature: '温度',
+    brightness: '亮度',
+    volume: '音量',
+    open_percent: '开合',
+    speed: '风速',
+    mode: '模式',
+    fan_speed: '风量',
+    channel: '频道',
+    color_temperature: '色温'
+  }
+  return labels[key] || key
+}
+
+function getIntentLabel(intent) {
+  const labels = {
+    turn_on: '打开设备',
+    turn_off: '关闭设备',
+    set_temperature: '调节温度',
+    set_brightness: '调节亮度',
+    set_volume: '调节音量',
+    query_status: '查询状态',
+    run_scene: '执行场景',
+    create_reminder: '创建提醒',
+    query_weather: '查询天气'
+  }
+  return labels[intent] || intent
+}
+
+function emptyCommandDisplay() {
+  return {
+    title: '暂无执行结果',
+    details: [],
+    meta: [],
+    changes: [],
+    noChangeText: '',
+    batchItems: []
+  }
+}
+
 export function summarizeCommandExecution(executionResult = {}) {
   if (!executionResult || typeof executionResult !== 'object') return '无执行结果'
   const data = executionResult.data || executionResult
-  if (data.is_batch) {
-    return `批量执行：成功 ${data.success_count ?? 0} 条，失败 ${data.failed_count ?? 0} 条`
+  if (data.is_batch || data.isBatch) {
+    return `批量执行：成功 ${data.success_count ?? data.successCount ?? 0} 条，失败 ${data.failed_count ?? data.failedCount ?? 0} 条`
   }
   const result = data.result || data
+  const deviceBefore = data.device_before || data.deviceBefore || result.before_state || result.beforeState
+  const deviceAfter = data.device_after || data.deviceAfter || result.after_state || result.afterState
+  const reminder = data.reminder || result.reminder
+  const weather = data.weather || result.weather
+  const scene = data.scene || result.scene
+  const changes = data.changes || result.changes || []
 
   if (result.device) {
     const device = normalizeDevice(result.device)
-    return `${device.roomName || ''}${device.name || '设备'}：${device.isOn ? '开启' : '关闭'}`
+    const deviceName = device.roomName && !String(device.name || '').includes(device.roomName)
+      ? `${device.roomName}${device.name || '设备'}`
+      : device.name || '设备'
+    return `${deviceName}：${formatDeviceState(deviceAfter || {
+      is_on: result.device.is_on,
+      properties: result.device.properties || {}
+    })}`
   }
-  if (result.before_state || result.after_state) {
-    return `状态变化：${formatDeviceState(result.after_state || {})}`
+  if (deviceBefore || deviceAfter) {
+    return `状态变化：${formatDeviceState(deviceAfter || {})}`
   }
   if (result.devices) {
     return `查询到 ${result.devices.length} 台设备`
   }
-  if (result.reminder) {
-    return `提醒：${result.reminder.title || result.reminder.reminder_content || '已创建'}`
+  if (reminder) {
+    const title = reminder.title || reminder.reminder_content || '已创建'
+    return reminder.remind_time ? `提醒：${title}，时间 ${formatDateTime(reminder.remind_time)}` : `提醒：${title}`
   }
-  if (result.weather) {
-    return `${result.weather.city || '本地'}天气：${result.weather.weather || '--'}`
+  if (weather) {
+    const temperature = weather.temperature !== undefined ? `，${weather.temperature}℃` : ''
+    return `${weather.city || '本地'}天气：${weather.weather || '--'}${temperature}`
   }
-  if (result.scene) {
-    return `${result.scene.name || '场景'}已执行，影响 ${(result.changes || []).length} 台设备`
+  if (scene) {
+    return `${scene.name || '场景'}已执行，影响 ${changes.length} 台设备`
   }
-  if (result.changes) {
-    return `影响 ${result.changes.length} 台设备`
+  if (changes.length) {
+    return `影响 ${changes.length} 台设备`
   }
-  return JSON.stringify(result)
+  if (result !== data && Object.keys(result).length) return JSON.stringify(result)
+  return data.message || '无执行结果'
 }
 
 export function formatJson(value) {

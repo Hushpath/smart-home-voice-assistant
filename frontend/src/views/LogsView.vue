@@ -4,7 +4,6 @@
       <div>
         <p class="panel-kicker">Command audit</p>
         <h2>操作日志</h2>
-        <p>列表保留关键摘要，详情中展示 ASR、方言容错、解析和执行链路。</p>
       </div>
       <div class="toolbar-actions">
         <el-input v-model="keyword" clearable placeholder="搜索指令、trace_id 或错误信息" />

@@ -326,7 +326,7 @@ ASR transcript / 浏览器识别文本 / 文本输入
 - 关上 -> 关闭
 - 整亮点 -> 设置亮度
 
-ASR 常见错词示例：
+识别文本常见错词示例：
 
 - 客厅等 -> 客厅灯
 - 卧室等 -> 卧室灯
@@ -400,8 +400,8 @@ voice_YYYYMMDD_HHMMSS_random
 日志详情记录：
 
 - 输入来源：`cloud_asr`、`browser_speech`、`text_input`
-- ASR 信息：provider、transcript、confidence、latency、raw_result、错误码
-- 方言归一：detected_dialect、normalized_text、dialect_matches、asr_corrections、number_conversions、removed_fillers
+- ASR 信息：provider、transcript、latency、raw_result、错误码
+- 方言归一：detected_dialect、normalized_text、dialect_matches、识别文本纠错、number_conversions、removed_fillers
 - 指令解析：intent、room、device_type、value、scene、reminder、city、intent_scores、matched_keywords、match_type
 - 执行结果：success、code、message、device_before、device_after、affected_devices、execution_latency_ms
 - 批量链路：is_batch、command_count、sub_commands、sub_results、success_count、failed_count

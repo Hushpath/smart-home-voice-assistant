@@ -399,8 +399,8 @@ input {
   grid-column: 1 / -1;
   align-items: center;
   justify-content: space-between;
-  min-height: 220px;
-  padding: 30px;
+  min-height: 160px;
+  padding: 26px 30px;
   border-radius: var(--radius-xl);
   background:
     linear-gradient(135deg, rgba(16, 41, 69, 0.9), rgba(7, 17, 31, 0.72)),
@@ -525,13 +525,14 @@ input {
 .dashboard-lower-grid {
   display: grid;
   grid-template-columns: 1.2fr 1fr 1fr;
+  align-items: start;
   gap: 20px;
 }
 
 .weather-card,
 .command-card,
 .scene-shortcuts {
-  min-height: 205px;
+  min-height: 176px;
   padding: 24px;
   border-radius: var(--radius-xl);
   background: var(--panel);
@@ -550,7 +551,7 @@ input {
 .weather-card h3,
 .command-card h3,
 .scene-shortcuts h3 {
-  margin: 0 0 14px;
+  margin: 0 0 16px;
   color: var(--text-main);
   font-size: 24px;
 }
@@ -1094,7 +1095,8 @@ input {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  padding: 26px;
+  min-height: 128px;
+  padding: 22px 26px;
   border-radius: var(--radius-xl);
   background:
     linear-gradient(135deg, rgba(16, 41, 69, 0.9), rgba(7, 17, 31, 0.72)),
@@ -1292,6 +1294,93 @@ input {
 .direct-summary-card {
   display: grid;
   gap: 14px;
+}
+
+.direct-summary-card .command-result-head {
+  align-items: flex-start;
+}
+
+.direct-summary-card .command-result-head strong {
+  max-width: 78%;
+  line-height: 1.35;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.result-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px 20px;
+}
+
+.result-detail-grid div {
+  min-width: 0;
+  border-bottom: 1px solid rgba(109, 242, 193, 0.14);
+  padding-bottom: 8px;
+}
+
+.result-detail-grid label {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.result-detail-grid strong {
+  display: block;
+  color: var(--text-main);
+  font-size: 17px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.result-detail-grid div.danger strong {
+  color: var(--danger);
+}
+
+.result-meta-tags span {
+  color: var(--text);
+  background: rgba(35, 211, 255, 0.06);
+  border-color: rgba(35, 211, 255, 0.18);
+}
+
+.state-change-list {
+  display: grid;
+  gap: 8px;
+}
+
+.state-change-list article {
+  display: grid;
+  grid-template-columns: minmax(56px, 88px) auto auto;
+  justify-content: start;
+  gap: 8px;
+  align-items: center;
+  color: var(--text-muted);
+}
+
+.state-change-list label {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.state-change-list span,
+.state-change-list strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.state-change-list span::after {
+  content: " →";
+  color: var(--accent-sky);
+}
+
+.state-change-list strong {
+  color: var(--accent-mint);
+}
+
+.state-no-change {
+  margin: 0;
+  color: var(--text-muted);
 }
 
 .summary-actions {
@@ -1649,22 +1738,25 @@ pre {
 
 .scene-change-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 12px;
 }
 
 .scene-change-list article {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(96px, 0.8fr) minmax(0, 1.4fr);
+  gap: 10px;
+  align-items: center;
 }
 
 .scene-change-list strong {
   color: var(--text-main);
+  overflow-wrap: anywhere;
 }
 
 .scene-change-list span {
   color: var(--text-muted);
+  overflow-wrap: anywhere;
 }
 
 .recent-log-list {

@@ -23,9 +23,9 @@
       <el-progress
         v-if="parsed.confidencePercent !== null && parsed.confidencePercent !== undefined"
         :percentage="parsed.confidencePercent"
-        :status="parsed.confidencePercent < 60 ? 'exception' : 'success'"
+        :status="parsed.confidence < LOW_CONFIDENCE_THRESHOLD ? 'exception' : 'success'"
       />
-      <p v-if="parsed.confidence !== null && parsed.confidence < 0.6" class="result-warning">
+      <p v-if="parsed.confidence !== null && parsed.confidence < LOW_CONFIDENCE_THRESHOLD" class="result-warning">
         系统不太确定你的指令含义，请换一种说法，或使用文本输入。
       </p>
     </div>
@@ -58,7 +58,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { formatDeviceState, formatJson, normalizeParsedCommand, summarizeCommandExecution } from '../utils/normalizers'
+import { LOW_CONFIDENCE_THRESHOLD, formatDeviceState, formatJson, normalizeParsedCommand, summarizeCommandExecution } from '../utils/normalizers'
 
 const props = defineProps({
   payload: {

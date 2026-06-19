@@ -15,6 +15,8 @@ def assert_parse(response, expected):
     assert data["confidence"] >= 0.6
     assert "normalized_text" in data
     assert "parse_detail" in data
+    breakdown = data["parse_detail"]["confidence_breakdown"]
+    assert breakdown["final_confidence"] == data["confidence"]
     for key, value in expected.items():
         assert data[key] == value
 
@@ -172,6 +174,35 @@ def test_parse_fuzzy_and_alias_variants(client, auth_headers, command, expected)
     assert_parse(response, expected)
     data = response.json()["data"]
     assert data["match_type"] in {"alias", "fuzzy", "exact"}
+
+
+def test_parse_confidence_breakdown_exact_command(client, auth_headers):
+    response = parse_command(client, auth_headers, "打开客厅灯")
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    breakdown = data["parse_detail"]["confidence_breakdown"]
+    assert breakdown == {
+        "base_score": 0.75,
+        "room_bonus": 0.06,
+        "device_bonus": 0.06,
+        "value_bonus": 0.0,
+        "fuzzy_penalty": 0.0,
+        "asr_correction_penalty": 0.0,
+        "multi_fuzzy_penalty": 0.0,
+        "final_confidence": data["confidence"],
+    }
+
+
+def test_parse_confidence_breakdown_asr_correction(client, auth_headers):
+    response = parse_command(client, auth_headers, "打开客厅等")
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    breakdown = data["parse_detail"]["confidence_breakdown"]
+    assert breakdown["asr_correction_penalty"] == 0.04
+    assert breakdown["multi_fuzzy_penalty"] == 0.04
+    assert breakdown["final_confidence"] == data["confidence"]
 
 
 @pytest.mark.parametrize(

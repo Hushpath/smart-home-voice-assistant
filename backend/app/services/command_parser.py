@@ -32,6 +32,7 @@ SCENE_KEYWORDS = ["睡眠模式", "回家模式", "离家模式"]
 CITY_KEYWORDS = ["北京", "上海", "广州", "深圳", "杭州", "南京", "成都", "重庆", "西安", "武汉"]
 FILLER_WORDS = ["帮我", "请", "麻烦", "一下", "可以", "现在", "给我"]
 PUNCTUATION_PATTERN = re.compile(r"[\s，。！？、；：,.!?;\"'“”‘’（）()\[\]【】]")
+LOW_CONFIDENCE_THRESHOLD = 0.6
 CHINESE_DIGITS = {
     "零": 0,
     "〇": 0,
@@ -140,7 +141,7 @@ class CommandParser:
         if not result.valid:
             return result
 
-        if result.confidence < 0.6 and result.intent in {
+        if result.confidence < LOW_CONFIDENCE_THRESHOLD and result.intent in {
             "turn_on",
             "turn_off",
             "set_temperature",
@@ -202,7 +203,8 @@ class CommandParser:
         parse_detail: dict[str, Any],
     ) -> ParseResult:
         text = normalized.normalized_text
-        confidence = self._calculate_confidence(intent, score, room_match, device_match, value_info, time_info)
+        confidence, confidence_breakdown = self._calculate_confidence(intent, score, room_match, device_match, value_info, time_info)
+        parse_detail["confidence_breakdown"] = confidence_breakdown
         base = {
             "original_text": normalized.original_text,
             "normalized_text": text,
@@ -532,19 +534,37 @@ class CommandParser:
         device_match: dict[str, Any],
         value_info: dict[str, Any],
         time_info: dict[str, Any],
-    ) -> float:
-        confidence = min(0.45 + score * 0.06, 0.92)
+    ) -> tuple[float, dict[str, float]]:
+        base_score = min(0.45 + score * 0.06, 0.92)
+        room_bonus = 0.0
+        device_bonus = 0.0
+        value_bonus = 0.0
+        fuzzy_penalty = 0.0
+
         if room_match.get("room"):
-            confidence += 0.04 if room_match.get("match_type") == "fuzzy" else 0.06
+            room_bonus = 0.04 if room_match.get("match_type") == "fuzzy" else 0.06
         if device_match.get("device_type"):
-            confidence += 0.04 if device_match.get("match_type") == "fuzzy" else 0.06
+            device_bonus = 0.04 if device_match.get("match_type") == "fuzzy" else 0.06
         if intent in {"set_temperature", "set_brightness", "set_volume"} and value_info.get("value") is not None:
-            confidence += 0.05
+            value_bonus = 0.05
         if intent == "create_reminder" and time_info.get("value"):
-            confidence += 0.05
+            value_bonus = 0.05
         if room_match.get("match_type") == "fuzzy" or device_match.get("match_type") == "fuzzy":
-            confidence -= 0.08
-        return round(max(0.0, min(confidence, 0.99)), 2)
+            fuzzy_penalty = 0.08
+
+        confidence = base_score + room_bonus + device_bonus + value_bonus - fuzzy_penalty
+        final_confidence = round(max(0.0, min(confidence, 0.99)), 2)
+        breakdown = {
+            "base_score": round(base_score, 2),
+            "room_bonus": round(room_bonus, 2),
+            "device_bonus": round(device_bonus, 2),
+            "value_bonus": round(value_bonus, 2),
+            "fuzzy_penalty": round(fuzzy_penalty, 2),
+            "asr_correction_penalty": 0.0,
+            "multi_fuzzy_penalty": 0.0,
+            "final_confidence": final_confidence,
+        }
+        return final_confidence, breakdown
 
     def _overall_match_type(self, room_match: dict[str, Any], device_match: dict[str, Any]) -> str | None:
         types = [room_match.get("match_type"), device_match.get("match_type")]

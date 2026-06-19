@@ -16,7 +16,6 @@ class VoiceRecognitionData(BaseModel):
     trace_id: str
     provider: str
     transcript: str
-    confidence: float | None = None
     duration: float | None = None
     latency_ms: int | None = None
     dialect: str | None = None

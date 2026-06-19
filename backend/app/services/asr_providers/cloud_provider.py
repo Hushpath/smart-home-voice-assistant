@@ -314,7 +314,6 @@ class CloudASRProvider(ASRProvider):
         return ASRRecognitionResult(
             provider=self.name,
             transcript=transcript,
-            confidence=None,
             duration=None,
             latency_ms=latency_ms,
             dialect=dialect,
@@ -496,12 +495,10 @@ class CloudASRProvider(ASRProvider):
                 latency_ms=latency_ms,
             )
 
-        confidence = payload.get("confidence")
         duration = payload.get("duration")
         return ASRRecognitionResult(
             provider=self.name,
             transcript=transcript,
-            confidence=confidence if isinstance(confidence, (int, float)) else None,
             duration=duration if isinstance(duration, (int, float)) else None,
             latency_ms=latency_ms,
             dialect=dialect,
