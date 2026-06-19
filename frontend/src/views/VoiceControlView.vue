@@ -410,7 +410,7 @@ const inputModes = computed(() => [
     key: 'text',
     icon: 'TXT',
     title: '文本输入',
-    description: '手动输入，适合演示兜底',
+    description: '手动输入文本',
     status: '可用',
     disabled: false
   }

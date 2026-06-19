@@ -7,8 +7,10 @@
 ```text
 前端录音 / 浏览器语音识别 / 文本输入
 → 后端 ASR Provider
+→ ASR 后纠错
 → 方言/口音容错层
 → 鲁棒指令解析
+→ 设备能力表校验
 → 设备控制 / 场景 / 提醒 / 天气
 → 操作日志和设备历史
 ```
@@ -22,10 +24,10 @@
 - 房间与设备查询，支持设备手动开关和状态历史查看。
 - 三种指令输入路径：云端 ASR 音频上传、浏览器 Web Speech API、文本输入兜底。
 - 可插拔 ASR Provider：当前提供云端 Provider 框架和测试用 Mock Provider。
-- 方言/口音容错层：重点增强粤语，轻量支持西南、东北/北方口语。
-- 鲁棒中文指令解析与执行，支持设备控制、状态查询、场景执行、提醒创建和天气查询。
+- ASR 后纠错和方言/口音容错层：基于领域词表修正常见识别错词，重点增强粤语，轻量支持西南、东北/北方口语。
+- 鲁棒中文指令解析与执行，支持设备控制、设备参数调节、状态查询、场景执行、提醒创建和天气查询。
 - 多指令解析与批量执行，支持一句话中包含多个设备控制、场景、提醒或天气指令。
-- 操作日志记录 trace_id、ASR、方言归一、解析和执行全过程。
+- 操作日志记录 trace_id、ASR、ASR 后纠错、方言归一、解析和执行全过程。
 - 个性化语音交互：支持用户偏好、设备别名、默认方言自动学习建议和常用指令推荐。
 - 提醒事项创建、查询、修改和删除。
 - 场景模式执行，当前包含回家模式、睡眠模式和离家模式。
@@ -295,8 +297,11 @@ npm run build
 
 ```text
 ASR transcript / 浏览器识别文本 / 文本输入
+→ ASRPostCorrector
 → DialectNormalizer
+→ MultiCommandParser
 → CommandParser
+→ device_capabilities
 → CommandExecutor
 ```
 
@@ -304,7 +309,9 @@ ASR transcript / 浏览器识别文本 / 文本输入
 
 ## 方言/口音容错
 
-`DialectNormalizer` 位于 ASR 和 `CommandParser` 之间，不直接决定业务执行，只输出标准化文本和归一化详情。
+`ASRPostCorrector` 位于 ASR transcript / 浏览器识别文本 / 文本输入之后，使用固定高置信错词和当前用户的房间、设备、设备别名、场景、参数能力表生成领域词表，保守修正常见识别错词，例如 `冰香 -> 冰箱`、`空气进化器 -> 空气净化器`。纠错详情记录为 `asr_post_correction`。
+
+`DialectNormalizer` 位于 ASR 后纠错和 `CommandParser` 之间，不直接决定业务执行，只输出标准化文本和归一化详情。
 
 支持模式：
 
@@ -407,7 +414,7 @@ voice_YYYYMMDD_HHMMSS_random
 日志详情记录：
 
 - 输入来源：`cloud_asr`、`browser_speech`、`text_input`
-- ASR 信息：provider、transcript、latency、raw_result、错误码
+- ASR 信息：provider、transcript、corrected_transcript、latency、raw_result、错误码和 `asr_post_correction`
 - 方言归一：detected_dialect、normalized_text、dialect_matches、识别文本纠错、number_conversions、removed_fillers
 - 指令解析：intent、room、device_type、value、scene、reminder、city、intent_scores、matched_keywords、match_type
 - 执行结果：success、code、message、device_before、device_after、affected_devices、execution_latency_ms
@@ -510,6 +517,7 @@ npm run build
 - 系统不训练自己的语音识别模型。
 - 云端 ASR 需要 API Key 和网络；当前已适配讯飞语音听写，其他厂商仍需按官方文档扩展。
 - 未配置云端 ASR 时，应使用浏览器识别或文本输入兜底。
+- ASR 后纠错只在项目领域词表内保守修正，不做通用中文纠错。
 - 方言支持是有限场景下的指令容错，不是完整方言自然对话。
 - 多指令拆分是规则式能力，适合常见连接词、对象前置和共享上下文，并包含基础歧义保护；不覆盖任意复杂自然语言并列结构。
 - 粤语是重点增强，但不是完整粤语对话系统。

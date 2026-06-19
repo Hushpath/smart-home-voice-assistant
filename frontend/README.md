@@ -10,7 +10,7 @@
 文本输入兜底
 ```
 
-方言归一、多指令拆分、指令解析、云端 ASR 调用和执行日志都由后端负责。前端不直连云端 ASR，也不保存 API Key。
+ASR 后纠错、方言归一、多指令拆分、指令解析、云端 ASR 调用和执行日志都由后端负责。前端不直连云端 ASR，也不保存 API Key。
 
 ## 技术栈
 
@@ -288,6 +288,7 @@ GET /api/user/frequent-commands
 
 - 链路概览
 - 语音识别信息
+- ASR 后纠错信息：corrected transcript 和 `asr_post_correction`
 - 方言容错信息
 - 指令解析信息，包括 Parser 置信度和 `confidence_breakdown` 分数拆解
 - 批量执行信息

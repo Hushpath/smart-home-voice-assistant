@@ -13,6 +13,7 @@ STATE_CHANGING_INTENTS = {
     "set_temperature",
     "set_brightness",
     "set_volume",
+    "set_property",
     "run_scene",
     "create_reminder",
 }

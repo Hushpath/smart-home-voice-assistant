@@ -16,9 +16,11 @@
 ```text
 前端录音 / 浏览器语音识别 / 文本输入
 → 后端 ASR Provider
+→ ASRPostCorrector
 → DialectNormalizer
 → MultiCommandParser
 → CommandParser
+→ device_capabilities 校验
 → CommandExecutor
 → command_logs / device_status_history
 ```
@@ -54,8 +56,8 @@
 
 ## 关键边界
 
-- 语音控制主页面保持简洁，只展示执行摘要；ASR、方言归一、解析和执行细节放在日志详情。
-- 方言/口音容错必须在后端完成，位于 ASR 和 `CommandParser` 之间。
+- 语音控制主页面保持简洁，只展示执行摘要；ASR、ASR 后纠错、方言归一、解析和执行细节放在日志详情。
+- ASR 后纠错、方言/口音容错和语义解析必须在后端完成，位于 ASR transcript / 文本输入和 `CommandParser` 之间。
 - 云端 ASR 未配置时，后端返回清晰错误和 fallback 建议；浏览器识别由前端完成，后端不要静默回退。
 - 低置信度二次确认机制暂不实现。
 - 设备控制使用虚拟设备，状态变更必须写入设备历史。

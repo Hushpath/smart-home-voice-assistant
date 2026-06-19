@@ -17,6 +17,10 @@ from app.services.asr_providers.base import ASRProvider, ASRProviderError, ASRRe
 from app.services.asr_config_store import DEFAULT_XUNFEI_BASE_URL, load_asr_file_config
 
 
+XUNFEI_FRAME_SIZE_BYTES = 1280
+XUNFEI_FRAME_INTERVAL_SECONDS = 0.04
+
+
 def _env_bool(name: str, default: bool = False) -> bool:
     value = os.getenv(name)
     if value is None:
@@ -248,8 +252,11 @@ class CloudASRProvider(ASRProvider):
             if hasattr(websocket, "WebSocketTimeoutException"):
                 timeout_errors = (TimeoutError, websocket.WebSocketTimeoutException)
             ws = websocket.create_connection(self._build_xunfei_url(), timeout=self.timeout_seconds)
-            for frame in self._build_xunfei_frames(audio_payload, audio_format, audio_encoding, dialect, trace_id):
+            frames = self._build_xunfei_frames(audio_payload, audio_format, audio_encoding, dialect)
+            for index, frame in enumerate(frames):
                 ws.send(json.dumps(frame, ensure_ascii=False))
+                if index < len(frames) - 1:
+                    time.sleep(XUNFEI_FRAME_INTERVAL_SECONDS)
             while True:
                 message = ws.recv()
                 payload = json.loads(message)
@@ -384,10 +391,9 @@ class CloudASRProvider(ASRProvider):
         audio_format: str,
         audio_encoding: str,
         dialect: str | None,
-        trace_id: str,
     ) -> list[dict[str, Any]]:
         config = self.config
-        chunk_size = 1280
+        chunk_size = XUNFEI_FRAME_SIZE_BYTES
         chunks = [audio_bytes[index : index + chunk_size] for index in range(0, len(audio_bytes), chunk_size)] or [b""]
         frames: list[dict[str, Any]] = []
         for index, chunk in enumerate(chunks):
@@ -409,7 +415,6 @@ class CloudASRProvider(ASRProvider):
                     "domain": "iat",
                     "accent": self._xunfei_accent(dialect),
                     "vinfo": 1,
-                    "trace_id": trace_id,
                 }
             frames.append(frame)
         if len(frames) == 1:

@@ -1,0 +1,60 @@
+INFO:     Will watch for changes in these directories: ['D:\\mawjt\\Desktop\\software\\backend']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [16492] using WatchFiles
+INFO:     Started server process [13360]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app\services\device_capabilities.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for background tasks to complete. (CTRL+C to force quit)
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [13360]
+WARNING:  WatchFiles detected changes in 'app\services\command_executor.py', 'app\services\device_capabilities.py', 'app\services\multi_command_parser.py', 'app\services\command_parser.py', 'app\services\dialect_normalizer.py'. Reloading...
+INFO:     Started server process [17260]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [17260]
+INFO:     Started server process [6888]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app\services\device_capabilities.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [6888]
+WARNING:  WatchFiles detected changes in 'tests\test_command_parse.py', 'app\services\command_parser.py', 'tests\test_command_execute.py'. Reloading...
+Process SpawnProcess-4:
+Traceback (most recent call last):
+  File "C:\Users\mawjt\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\Lib\multiprocessing\process.py", line 314, in _bootstrap
+    self.run()
+  File "C:\Users\mawjt\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\Lib\multiprocessing\process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "D:\mawjt\Desktop\software\backend\.venv\Lib\site-packages\uvicorn\_subprocess.py", line 73, in subprocess_started
+    sys.stdin = os.fdopen(stdin_fileno)  # pragma: full coverage
+                ^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen os>", line 1066, in fdopen
+  File "<frozen codecs>", line 309, in __init__
+KeyboardInterrupt
+INFO:     Started server process [14756]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app\services\asr_post_corrector.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [14756]
+WARNING:  WatchFiles detected changes in 'app\services\asr_post_corrector.py', 'app\services\command_executor.py', 'tests\test_asr_post_corrector.py', 'app\routers\commands.py', 'app\routers\voice.py'. Reloading...
+INFO:     Started server process [12428]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [12428]
+INFO:     Started server process [12768]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.

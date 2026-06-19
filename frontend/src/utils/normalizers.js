@@ -458,6 +458,11 @@ function buildAssistantSpeechForSingle(item = {}) {
     const value = parsed.value ?? properties.volume
     return `已将${deviceName}音量调到${value}`
   }
+  if (intent === 'set_property') {
+    const key = parsed.property_name || parsed.propertyName
+    const value = parsed.property_value ?? parsed.propertyValue ?? properties[key]
+    return `已将${deviceName}${getPropertyLabel(key)}调到${formatPropertyValue(key, value)}`
+  }
   if (intent === 'run_scene') {
     const scene = item.scene || result.scene || {}
     return `已为你开启${scene.name || parsed.scene || '场景'}`
@@ -621,7 +626,7 @@ function buildSingleDisplay(item = {}) {
   const changes = buildStateChangeRows(deviceBefore, deviceAfter)
   const title = buildDisplayTitle(item, result, parsed, deviceName)
 
-  if (['turn_on', 'turn_off', 'set_temperature', 'set_brightness', 'set_volume'].includes(intent)) {
+  if (['turn_on', 'turn_off', 'set_temperature', 'set_brightness', 'set_volume', 'set_property'].includes(intent)) {
     addDetail(details, '设备', deviceName)
     addDeviceStateDetails(details, intent, deviceAfter, result.device?.properties || {})
   } else if (intent === 'query_status') {
@@ -682,6 +687,11 @@ function buildDisplayTitle(item = {}, result = {}, parsed = {}, deviceName = '')
   if (intent === 'set_temperature') return `已将${deviceName}调到 ${parsed.value ?? properties.temperature} 度`
   if (intent === 'set_brightness') return `已将${deviceName}亮度调到 ${parsed.value ?? properties.brightness}%`
   if (intent === 'set_volume') return `已将${deviceName}音量调到 ${parsed.value ?? properties.volume}`
+  if (intent === 'set_property') {
+    const key = parsed.property_name || parsed.propertyName
+    const value = parsed.property_value ?? parsed.propertyValue ?? properties[key]
+    return `已将${deviceName}${getPropertyLabel(key)}调到 ${formatPropertyValue(key, value)}`
+  }
   if (intent === 'query_status') return `${parsed.room || '全部房间'}设备状态已查询`
   if (intent === 'run_scene') {
     const scene = item.scene || result.scene || {}
@@ -724,6 +734,8 @@ function addDeviceStateDetails(details, intent, state = {}, fallbackProperties =
   addDetail(details, '开合', formatPropertyValue('open_percent', properties.open_percent))
   addDetail(details, '风速', properties.speed)
   addDetail(details, '色温', properties.color_temperature)
+  addDetail(details, '目标湿度', formatPropertyValue('humidity_target', properties.humidity_target))
+  addDetail(details, '功率', formatPropertyValue('power_watt', properties.power_watt))
 }
 
 function buildStateChangeRows(before = null, after = null) {
@@ -778,7 +790,8 @@ function formatReminderDisplayTime(parsed = {}, reminder = {}) {
 function formatPropertyValue(key, value) {
   if (value === null || value === undefined || value === '') return ''
   if (key === 'temperature') return `${value}℃`
-  if (key === 'brightness' || key === 'open_percent') return `${value}%`
+  if (key === 'brightness' || key === 'open_percent' || key === 'humidity_target') return `${value}%`
+  if (key === 'power_watt') return `${value}W`
   return value
 }
 
@@ -792,7 +805,9 @@ function getPropertyLabel(key) {
     mode: '模式',
     fan_speed: '风量',
     channel: '频道',
-    color_temperature: '色温'
+    color_temperature: '色温',
+    humidity_target: '目标湿度',
+    power_watt: '功率'
   }
   return labels[key] || key
 }
@@ -804,6 +819,7 @@ function getIntentLabel(intent) {
     set_temperature: '调节温度',
     set_brightness: '调节亮度',
     set_volume: '调节音量',
+    set_property: '调节参数',
     query_status: '查询状态',
     run_scene: '执行场景',
     create_reminder: '创建提醒',

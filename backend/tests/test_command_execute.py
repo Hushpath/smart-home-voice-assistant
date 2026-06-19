@@ -123,6 +123,43 @@ def test_execute_adjust_new_device_properties(client, auth_headers, testing_sess
         db.close()
 
 
+def test_execute_all_device_property_capabilities(client, auth_headers, testing_session_factory):
+    cases = [
+        ("把客厅灯色温设置为冷白", "客厅", "light", "color_temperature", "冷白"),
+        ("把书房台灯色温设置为暖黄", "书房", "desk_lamp", "color_temperature", "暖黄"),
+        ("把卧室床头灯色温设置为自然光", "卧室", "bedside_lamp", "color_temperature", "自然光"),
+        ("把客厅空调模式设置为制热", "客厅", "air_conditioner", "mode", "制热"),
+        ("把客厅空调风量设置为高速", "客厅", "air_conditioner", "fan_speed", "高速"),
+        ("把客厅电视频道设置为CCTV5", "客厅", "tv", "channel", "CCTV-5"),
+        ("把客厅窗帘开合比例调整为五十", "客厅", "curtain", "open_percent", 50),
+        ("把厨房排风扇风速设置为高速", "厨房", "fan", "speed", "高速"),
+        ("把客厅音箱模式设置为播放", "客厅", "speaker", "mode", "播放"),
+        ("把卧室加湿器湿度设置为60", "卧室", "humidifier", "humidity_target", 60),
+        ("把卧室加湿器模式设置为睡眠", "卧室", "humidifier", "mode", "睡眠"),
+        ("把书房空气净化器模式设置为强力", "书房", "air_purifier", "mode", "强力"),
+        ("把书房智能插座功率设置为1200瓦", "书房", "smart_plug", "power_watt", 1200),
+        ("把厨房冰箱温度设置为5度", "厨房", "fridge", "temperature", 5),
+        ("把厨房冰箱模式设置为速冷", "厨房", "fridge", "mode", "速冷"),
+    ]
+
+    for command, _, _, property_name, expected_value in cases:
+        response = execute_command(client, auth_headers, command)
+        assert response.status_code == 200
+        data = response.json()["data"]
+        assert data["parsed"]["intent"] == "set_property"
+        assert data["parsed"]["property_name"] == property_name
+        assert data["parsed"]["property_value"] == expected_value
+        assert data["result"]["after_state"]["properties"][property_name] == expected_value
+
+    db = testing_session_factory()
+    try:
+        for _, room_name, device_type, property_name, expected_value in cases:
+            device = get_device_by_room_and_type(db, room_name, device_type)
+            assert device.properties[property_name] == expected_value
+    finally:
+        db.close()
+
+
 def test_execute_sleep_scene(client, auth_headers, testing_session_factory):
     response = execute_command(client, auth_headers, "开启睡眠模式")
 
@@ -204,6 +241,40 @@ def test_temperature_out_of_range_writes_failed_log(client, auth_headers, testin
         log = db.query(CommandLog).one()
         assert log.success is False
         assert log.error_message == "温度必须在 16-30 范围内"
+    finally:
+        db.close()
+
+
+def test_property_out_of_range_uses_device_specific_rule(client, auth_headers, testing_session_factory):
+    response = execute_command(client, auth_headers, "把厨房冰箱温度设置为20度")
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "VALUE_OUT_OF_RANGE"
+    assert response.json()["message"] == "冷藏温度必须在 2-8 范围内"
+
+    db = testing_session_factory()
+    try:
+        device = get_device_by_room_and_type(db, "厨房", "fridge")
+        assert device.properties["temperature"] == 4
+        log = db.query(CommandLog).one()
+        assert log.success is False
+        assert log.error_message == "冷藏温度必须在 2-8 范围内"
+    finally:
+        db.close()
+
+
+def test_invalid_enum_property_value_does_not_change_device(client, auth_headers, testing_session_factory):
+    response = execute_command(client, auth_headers, "把厨房排风扇风速设置为自动")
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "INVALID_PROPERTY_VALUE"
+    assert response.json()["message"] == "风速仅支持 低速、中速、高速"
+
+    db = testing_session_factory()
+    try:
+        device = get_device_by_room_and_type(db, "厨房", "fan")
+        assert device.properties["speed"] == "中速"
+        assert db.query(DeviceStatusHistory).count() == 0
     finally:
         db.close()
 

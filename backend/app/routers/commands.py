@@ -5,6 +5,7 @@ from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models import CommandLog, User
 from app.schemas.command import CommandExecuteRequest, CommandParseRequest
+from app.services.asr_post_corrector import correct_asr_text
 from app.services.command_executor import CommandExecutor
 from app.services.command_parser import CommandParser
 from app.services.dialect_normalizer import normalize_and_parse_command
@@ -43,19 +44,29 @@ def parse_command(
 ):
     preference = get_or_create_preferences(db, current_user)
     dialect = payload.dialect or preference.preferred_dialect or "auto"
-    batch_result = multi_parser.parse(payload.command, dialect=dialect)
+    correction = correct_asr_text(payload.command, db=db, user=current_user)
+    command_for_parse = correction.corrected_text
+    batch_result = multi_parser.parse(command_for_parse, dialect=dialect)
     if batch_result.is_batch:
         data = batch_result.to_dict()
+        if correction.changed:
+            data["original_text"] = payload.command
+            data["asr_post_correction"] = correction.to_dict()
         data["preference_used"] = {"preferred_dialect": dialect}
         return success_response(data=data, message="解析成功")
 
-    result, normalization = normalize_and_parse_command(payload.command, parser=parser, dialect=dialect)
+    result, normalization = normalize_and_parse_command(command_for_parse, parser=parser, dialect=dialect)
+    if correction.changed:
+        result.original_text = payload.command
+        result.parse_detail["asr_post_correction"] = correction.to_dict()
     if not result.valid:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=error_response(result.error_code, result.message, result.to_dict()),
         )
     data = result.to_dict()
+    if correction.changed:
+        data["asr_post_correction"] = correction.to_dict()
     data["normalization"] = normalization.to_dict()
     data["preference_used"] = {"preferred_dialect": dialect}
     return success_response(data=data, message="解析成功")
@@ -129,11 +140,14 @@ def _extract_normalization(parsed_result: dict, context: dict) -> dict:
 
 def _build_asr_detail(context: dict) -> dict:
     raw_result = context.get("raw_asr_result", context.get("asr_raw_result"))
+    correction = context.get("asr_post_correction") if isinstance(context.get("asr_post_correction"), dict) else {}
     return {
         "trace_id": context.get("trace_id"),
         "input_source": context.get("input_source", "text"),
         "asr_provider": context.get("asr_provider"),
         "transcript": context.get("transcript"),
+        "corrected_transcript": correction.get("corrected_text") or context.get("transcript"),
+        "asr_post_correction": correction,
         "audio_duration": context.get("audio_duration"),
         "asr_latency_ms": context.get("asr_latency_ms"),
         "raw_asr_result": raw_result,

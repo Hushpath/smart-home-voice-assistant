@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.models import CommandLog, Reminder, Scene, User
+from app.services.asr_post_corrector import correct_asr_text
 from app.services.command_parser import CommandParser, ParseResult
 from app.services.dialect_normalizer import normalize_and_parse_command
 from app.services.home_actions import (
@@ -15,8 +16,8 @@ from app.services.home_actions import (
     get_weather,
     list_room_devices,
     run_scene_actions,
-    validate_value_range,
 )
+from app.services.device_capabilities import get_property_capability
 from app.services.multi_command_parser import MultiCommandParser, MultiCommandParseResult
 from app.services.personalization import (
     apply_alias_to_parsed,
@@ -39,7 +40,8 @@ class CommandExecutor:
         started_at = time.perf_counter()
         context = self._prepare_personal_context(context)
         dialect = context["dialect"]
-        command_for_parse, alias_match = self._rewrite_alias_command(command)
+        corrected_command = self._apply_asr_post_correction(command, context)
+        command_for_parse, alias_match = self._rewrite_alias_command(corrected_command)
         if alias_match:
             context["alias_match"] = alias_match
         multi_parsed = self.multi_parser.parse(command_for_parse, dialect=dialect)
@@ -49,10 +51,14 @@ class CommandExecutor:
         parsed, normalization = normalize_and_parse_command(command_for_parse, parser=self.parser, dialect=dialect)
         if command_for_parse != (command or ""):
             parsed.original_text = command or ""
-            parsed.parse_detail["alias_rewrite"] = {
-                "raw_command": command or "",
-                "rewritten_command": command_for_parse,
-            }
+            if corrected_command != (command or ""):
+                parsed.parse_detail["asr_post_correction"] = context.get("asr_post_correction")
+            if command_for_parse != corrected_command:
+                parsed.parse_detail["alias_rewrite"] = {
+                    "raw_command": command or "",
+                    "corrected_command": corrected_command,
+                    "rewritten_command": command_for_parse,
+                }
         apply_alias_to_parsed(parsed, alias_match)
         enriched_context = self._merge_normalization_context(context, normalization.to_dict())
         if not parsed.valid:
@@ -163,11 +169,13 @@ class CommandExecutor:
         if parsed.intent == "turn_off":
             return self._set_power(parsed, False)
         if parsed.intent == "set_temperature":
-            return self._set_property(parsed, "air_conditioner", "temperature", 16, 30, "温度")
+            return self._set_property(parsed, "temperature", "温度")
         if parsed.intent == "set_brightness":
-            return self._set_property(parsed, {"light", "desk_lamp", "bedside_lamp"}, "brightness", 0, 100, "亮度")
+            return self._set_property(parsed, "brightness", "亮度")
         if parsed.intent == "set_volume":
-            return self._set_property(parsed, {"tv", "speaker"}, "volume", 0, 100, "音量")
+            return self._set_property(parsed, "volume", "音量")
+        if parsed.intent == "set_property":
+            return self._set_property(parsed, parsed.property_name, "参数")
         if parsed.intent == "query_status":
             return {
                 "devices": [
@@ -204,16 +212,17 @@ class CommandExecutor:
     def _set_property(
         self,
         parsed: ParseResult,
-        expected_device_type: str | set[str],
-        property_name: str,
-        minimum: int,
-        maximum: int,
-        label: str,
+        property_name: str | None,
+        fallback_label: str,
     ) -> dict[str, Any]:
-        expected_types = {expected_device_type} if isinstance(expected_device_type, str) else expected_device_type
-        if parsed.device_type not in expected_types:
+        if not parsed.device_type:
+            raise BusinessError("INVALID_COMMAND", "未识别到要控制的设备")
+        capability = get_property_capability(parsed.device_type, property_name)
+        label = capability.label if capability else fallback_label
+        if capability is None:
             raise BusinessError("UNSUPPORTED_ACTION", f"该设备不支持设置{label}")
-        value = validate_value_range(parsed.value, minimum, maximum, label)
+        value = parsed.property_value if parsed.property_value is not None else parsed.value
+        value = self._validate_property_value(capability, value)
         device = self._find_target_device(parsed)
         return apply_device_state(
             db=self.db,
@@ -222,6 +231,18 @@ class CommandExecutor:
             state_update={"properties": {property_name: value}},
             change_source="command",
         )
+
+    def _validate_property_value(self, capability, value: Any) -> Any:
+        if capability.value_type == "number":
+            if not isinstance(value, int) or value < capability.minimum or value > capability.maximum:
+                raise BusinessError("VALUE_OUT_OF_RANGE", f"{capability.label}必须在 {capability.minimum}-{capability.maximum} 范围内")
+            return value
+        if capability.value_type == "enum":
+            if value not in capability.options:
+                options = "、".join(str(option) for option in capability.options)
+                raise BusinessError("INVALID_PROPERTY_VALUE", f"{capability.label}仅支持 {options}")
+            return value
+        raise BusinessError("UNSUPPORTED_ACTION", "暂不支持该参数类型")
 
     def _run_scene(self, parsed: ParseResult) -> dict[str, Any]:
         scene = (
@@ -413,6 +434,16 @@ class CommandExecutor:
         prepared["preference_used"] = preferred
         prepared["preference_used"]["preferred_dialect"] = dialect
         return prepared
+
+    def _apply_asr_post_correction(self, command: str | None, context: dict[str, Any]) -> str | None:
+        existing = context.get("asr_post_correction")
+        if isinstance(existing, dict) and existing.get("original_text") == (command or ""):
+            return existing.get("corrected_text") or command
+
+        correction = correct_asr_text(command, db=self.db, user=self.user)
+        if correction.changed:
+            context["asr_post_correction"] = correction.to_dict()
+        return correction.corrected_text
 
     def _rewrite_alias_command(self, command: str | None) -> tuple[str | None, dict[str, Any] | None]:
         alias_match = match_device_alias(self.db, self.user, command)

@@ -35,9 +35,11 @@
         <div class="detail-kv-grid">
           <div><label>ASR provider</label><strong>{{ value(asr.asr_provider) }}</strong></div>
           <div><label>transcript</label><strong>{{ value(asr.transcript) }}</strong></div>
+          <div><label>corrected transcript</label><strong>{{ value(asr.corrected_transcript) }}</strong></div>
           <div><label>音频时长</label><strong>{{ seconds(asr.audio_duration) }}</strong></div>
           <div><label>ASR 耗时</label><strong>{{ milliseconds(asr.asr_latency_ms) }}</strong></div>
         </div>
+        <JsonBlock title="asr_post_correction" :value="asr.asr_post_correction" />
         <JsonBlock title="raw_asr_result" :value="asr.raw_asr_result" />
       </section>
 

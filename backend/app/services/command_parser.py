@@ -4,6 +4,16 @@ from dataclasses import asdict, dataclass, field
 from difflib import SequenceMatcher
 from typing import Any
 
+from app.services.device_capabilities import (
+    PropertyCapability,
+    all_option_aliases,
+    all_property_aliases,
+    get_device_capabilities,
+    get_property_capability,
+    legacy_intent_for_property,
+    option_aliases,
+)
+
 
 ROOM_KEYWORDS = ["客厅", "卧室", "厨房", "书房", "阳台", "卫生间"]
 ROOM_ALIASES = {
@@ -81,6 +91,8 @@ class ParseResult:
     room: str | None = None
     device_type: str | None = None
     value: int | None = None
+    property_name: str | None = None
+    property_value: Any = None
     scene: str | None = None
     reminder_time: str | None = None
     reminder_content: str | None = None
@@ -109,10 +121,11 @@ class CommandParser:
         room_match = self._match_room(text)
         device_match = self._match_device(text)
         value_info = self._extract_value(text)
+        property_match = self._match_property(text, device_match.get("device_type"), value_info)
         time_info = self._extract_time(text)
         scene = self._find_scene(text)
         city = self._find_city(text)
-        intent_scores = self._score_intents(text, room_match, device_match, value_info, time_info, scene, city)
+        intent_scores = self._score_intents(text, room_match, device_match, value_info, property_match, time_info, scene, city)
         intent = max(intent_scores, key=intent_scores.get)
         score = intent_scores[intent]
 
@@ -121,6 +134,7 @@ class CommandParser:
             "room_match": room_match,
             "device_match": device_match,
             "value_extract": value_info,
+            "property_match": property_match,
             "time_extract": time_info,
             "normalization_steps": normalized.steps,
         }
@@ -129,6 +143,7 @@ class CommandParser:
             room_match.get("matched_keywords", []),
             device_match.get("matched_keywords", []),
             value_info.get("matched_keywords", []),
+            property_match.get("matched_keywords", []),
             time_info.get("matched_keywords", []),
             [scene] if scene else [],
             [city] if city else [],
@@ -149,6 +164,7 @@ class CommandParser:
             room_match=room_match,
             device_match=device_match,
             value_info=value_info,
+            property_match=property_match,
             time_info=time_info,
             scene=scene,
             city=city,
@@ -165,6 +181,7 @@ class CommandParser:
             "set_temperature",
             "set_brightness",
             "set_volume",
+            "set_property",
         }:
             result.valid = False
             result.error_code = "INVALID_COMMAND"
@@ -186,7 +203,7 @@ class CommandParser:
             steps.append("弱化口语词")
 
         replacements = [
-            (r"开一下|开启|启动|打开|开", "打开"),
+            (r"开一下|开启|启动|打开|开(?!合|度)", "打开"),
             (r"关一下|关掉|关闭|停止|关", "关闭"),
             (r"设置为|设为|调到|调成|调整到", "设置"),
             (r"电视机", "电视"),
@@ -213,6 +230,7 @@ class CommandParser:
         room_match: dict[str, Any],
         device_match: dict[str, Any],
         value_info: dict[str, Any],
+        property_match: dict[str, Any],
         time_info: dict[str, Any],
         scene: str | None,
         city: str | None,
@@ -221,7 +239,7 @@ class CommandParser:
         parse_detail: dict[str, Any],
     ) -> ParseResult:
         text = normalized.normalized_text
-        confidence, confidence_breakdown = self._calculate_confidence(intent, score, room_match, device_match, value_info, time_info)
+        confidence, confidence_breakdown = self._calculate_confidence(intent, score, room_match, device_match, value_info, property_match, time_info)
         parse_detail["confidence_breakdown"] = confidence_breakdown
         base = {
             "original_text": normalized.original_text,
@@ -232,6 +250,8 @@ class CommandParser:
             "parse_detail": parse_detail,
         }
 
+        if intent == "set_property":
+            return self._build_property_result(normalized, room_match, device_match, property_match, value_info, base)
         if intent in {"turn_on", "turn_off"}:
             if not device_match.get("device_type"):
                 return self._invalid(normalized, "未识别到要控制的设备", confidence, matched_keywords, parse_detail)
@@ -245,10 +265,18 @@ class CommandParser:
             )
 
         if intent == "set_temperature":
+            if property_match.get("property_name") and property_match.get("property_name") != "temperature":
+                return self._build_property_result(normalized, room_match, device_match, property_match, value_info, base)
+            if device_match.get("device_type") and device_match.get("device_type") != "air_conditioner":
+                return self._build_property_result(normalized, room_match, device_match, property_match, value_info, base)
             return self._build_value_result(normalized, "set_temperature", "air_conditioner", "温度", 16, 30, room_match, device_match, value_info, base)
         if intent == "set_brightness":
+            if property_match.get("property_name") and property_match.get("property_name") != "brightness":
+                return self._build_property_result(normalized, room_match, device_match, property_match, value_info, base)
             return self._build_value_result(normalized, "set_brightness", "light", "亮度", 0, 100, room_match, device_match, value_info, base)
         if intent == "set_volume":
+            if property_match.get("property_name") and property_match.get("property_name") != "volume":
+                return self._build_property_result(normalized, room_match, device_match, property_match, value_info, base)
             return self._build_value_result(normalized, "set_volume", "tv", "音量", 0, 100, room_match, device_match, value_info, base)
 
         if intent == "query_status":
@@ -290,6 +318,55 @@ class CommandParser:
 
         return self._invalid(normalized, "暂不支持该中文指令", confidence, matched_keywords, parse_detail)
 
+    def _build_property_result(
+        self,
+        normalized: NormalizedCommand,
+        room_match: dict[str, Any],
+        device_match: dict[str, Any],
+        property_match: dict[str, Any],
+        value_info: dict[str, Any],
+        base: dict[str, Any],
+    ) -> ParseResult:
+        device_type = device_match.get("device_type")
+        if not device_type:
+            return self._invalid(normalized, "未识别到要控制的设备", base["confidence"], base["matched_keywords"], base["parse_detail"])
+
+        property_name = property_match.get("property_name")
+        capability = get_property_capability(device_type, property_name)
+        if capability is None:
+            return self._invalid(normalized, "该设备不支持设置该参数", base["confidence"], base["matched_keywords"], base["parse_detail"], error_code="UNSUPPORTED_ACTION")
+
+        property_value = self._extract_property_value(normalized.normalized_text, capability, value_info)
+        if property_value is None and capability.value_type == "enum":
+            property_value = self._extract_any_enum_value(normalized.normalized_text)
+        if property_value is None:
+            return self._invalid(normalized, f"未识别到{capability.label}参数", base["confidence"], base["matched_keywords"], base["parse_detail"])
+
+        error_message = self._validate_property_value(capability, property_value)
+        if error_message:
+            return self._invalid(
+                normalized,
+                error_message,
+                base["confidence"],
+                base["matched_keywords"],
+                base["parse_detail"],
+                error_code="VALUE_OUT_OF_RANGE" if capability.value_type == "number" else "INVALID_PROPERTY_VALUE",
+            )
+
+        intent = legacy_intent_for_property(device_type, capability.property_name) or "set_property"
+        value = property_value if isinstance(property_value, int) else value_info.get("value")
+        return ParseResult(
+            intent=intent,
+            room=room_match.get("room"),
+            device_type=device_type,
+            value=value,
+            property_name=capability.property_name,
+            property_value=property_value,
+            valid=True,
+            message=f"识别为：设置{capability.label}为 {property_value}",
+            **base,
+        )
+
     def _build_value_result(
         self,
         normalized: NormalizedCommand,
@@ -321,6 +398,12 @@ class CommandParser:
             room=room_match.get("room"),
             device_type=device_type,
             value=value,
+            property_name={
+                "set_temperature": "temperature",
+                "set_brightness": "brightness",
+                "set_volume": "volume",
+            }.get(intent),
+            property_value=value,
             valid=True,
             message=f"识别为：设置{label}为 {value}",
             **base,
@@ -332,6 +415,7 @@ class CommandParser:
         room_match: dict[str, Any],
         device_match: dict[str, Any],
         value_info: dict[str, Any],
+        property_match: dict[str, Any],
         time_info: dict[str, Any],
         scene: str | None,
         city: str | None,
@@ -345,6 +429,7 @@ class CommandParser:
             "set_temperature": 0,
             "set_brightness": 0,
             "set_volume": 0,
+            "set_property": 0,
             "query_status": 0,
             "run_scene": 0,
             "create_reminder": 0,
@@ -359,6 +444,7 @@ class CommandParser:
             scores["set_temperature"] += 1
             scores["set_brightness"] += 1
             scores["set_volume"] += 1
+            scores["set_property"] += 1
         if device_type:
             scores["turn_on"] += 2
             scores["turn_off"] += 2
@@ -382,6 +468,13 @@ class CommandParser:
             scores["set_temperature"] += 2
             scores["set_brightness"] += 2
             scores["set_volume"] += 2
+            scores["set_property"] += 1
+        if property_match.get("property_name"):
+            scores["set_property"] += 4
+            if property_match.get("property_value") is not None:
+                scores["set_property"] += 2
+            if device_type:
+                scores["set_property"] += 1
         if re.search(r"(查看|查询).*(状态|设备)", text):
             scores["query_status"] += 4
         if scene:
@@ -400,6 +493,9 @@ class CommandParser:
             scores["query_weather"] += 1
 
         if scores["set_temperature"] >= 5:
+            scores["turn_on"] = max(0, scores["turn_on"] - 2)
+            scores["turn_off"] = max(0, scores["turn_off"] - 2)
+        if scores["set_property"] >= 5:
             scores["turn_on"] = max(0, scores["turn_on"] - 2)
             scores["turn_off"] = max(0, scores["turn_off"] - 2)
         return scores
@@ -473,6 +569,109 @@ class CommandParser:
             return {"value": None, "matched_text": None, "matched_keywords": []}
         return {"value": int(match.group()), "matched_text": match.group(), "matched_keywords": [match.group()]}
 
+    def _match_property(self, text: str, device_type: str | None, value_info: dict[str, Any]) -> dict[str, Any]:
+        empty = {"property_name": None, "matched_text": None, "match_type": None, "property_value": None, "score": 0.0, "matched_keywords": []}
+        capabilities = get_device_capabilities(device_type)
+        if not capabilities:
+            return empty
+
+        for capability in capabilities:
+            for alias in sorted(capability.aliases, key=len, reverse=True):
+                if alias in text:
+                    property_value = self._extract_property_value(text, capability, value_info)
+                    matched_keywords = [alias]
+                    if property_value is not None:
+                        matched_keywords.append(str(property_value))
+                    return {
+                        "property_name": capability.property_name,
+                        "matched_text": alias,
+                        "match_type": "exact",
+                        "property_value": property_value,
+                        "score": 1.0,
+                        "matched_keywords": matched_keywords,
+                    }
+
+        enum_matches = []
+        for capability in capabilities:
+            if capability.value_type != "enum":
+                continue
+            property_value = self._extract_property_value(text, capability, value_info)
+            if property_value is not None:
+                enum_matches.append((capability, property_value))
+        if len(enum_matches) == 1:
+            capability, property_value = enum_matches[0]
+            return {
+                "property_name": capability.property_name,
+                "matched_text": str(property_value),
+                "match_type": "value_inferred",
+                "property_value": property_value,
+                "score": 0.86,
+                "matched_keywords": [str(property_value)],
+            }
+
+        numeric_capabilities = [capability for capability in capabilities if capability.value_type == "number"]
+        if (
+            len(numeric_capabilities) == 1
+            and value_info.get("value") is not None
+            and self._looks_like_property_setting(text)
+            and not self._has_unsupported_property_alias(text, capabilities)
+        ):
+            capability = numeric_capabilities[0]
+            property_value = self._extract_property_value(text, capability, value_info)
+            return {
+                "property_name": capability.property_name,
+                "matched_text": value_info.get("matched_text"),
+                "match_type": "value_inferred",
+                "property_value": property_value,
+                "score": 0.82,
+                "matched_keywords": value_info.get("matched_keywords", []),
+            }
+        return empty
+
+    def _has_unsupported_property_alias(self, text: str, capabilities: tuple[PropertyCapability, ...]) -> bool:
+        supported = {alias for capability in capabilities for alias in capability.aliases}
+        for alias in all_property_aliases():
+            if alias in text and alias not in supported:
+                return True
+        return False
+
+    def _extract_property_value(self, text: str, capability: PropertyCapability, value_info: dict[str, Any]) -> Any:
+        if capability.value_type == "number":
+            if capability.property_name == "open_percent":
+                if re.search(r"(全开|完全打开|全部打开)", text):
+                    return 100
+                if re.search(r"(半开|开一半)", text):
+                    return 50
+                if re.search(r"(全关|完全关闭|全部关闭)", text):
+                    return 0
+            return value_info.get("value")
+
+        for alias, option in option_aliases(capability):
+            if alias in text:
+                return option
+        return None
+
+    def _extract_any_enum_value(self, text: str) -> Any:
+        for alias, option in all_option_aliases():
+            if alias in text:
+                return option
+        return None
+
+    def _validate_property_value(self, capability: PropertyCapability, value: Any) -> str | None:
+        if capability.value_type == "number":
+            if not isinstance(value, int) or value < (capability.minimum or 0) or value > (capability.maximum or 0):
+                return f"{capability.label}必须在 {capability.minimum}-{capability.maximum} 范围内"
+            return None
+        if capability.value_type == "enum":
+            if value not in capability.options:
+                options = "、".join(str(option) for option in capability.options)
+                return f"{capability.label}仅支持 {options}"
+            return None
+        return "暂不支持该参数类型"
+
+    def _looks_like_property_setting(self, text: str) -> bool:
+        return "设置" in text or bool(re.search(r"\d+(?:度|%|百分比|瓦)?", text))
+
     def _extract_time(self, text: str) -> dict[str, Any]:
         digital_match = re.search(r"(\d{1,2}):(\d{2})", text)
         if digital_match:
@@ -532,7 +731,7 @@ class CommandParser:
         return content.strip() or None
 
     def _replace_chinese_numbers(self, text: str) -> str:
-        pattern = re.compile(r"[零〇一二两三四五六七八九十]{1,4}")
+        pattern = re.compile(r"[零〇一二两三四五六七八九十百]{1,5}")
 
         def replace(match: re.Match) -> str:
             value = self._to_int(match.group(0))
@@ -543,6 +742,15 @@ class CommandParser:
     def _to_int(self, text: str) -> int | None:
         if text.isdigit():
             return int(text)
+        if text == "百":
+            return 100
+        if "百" in text:
+            left, right = text.split("百", 1)
+            hundreds = CHINESE_DIGITS.get(left, 1) if left else 1
+            rest = self._to_int(right.lstrip("零")) if right else 0
+            if rest is None:
+                return None
+            return hundreds * 100 + rest
         if text == "十":
             return 10
         if "十" in text:
@@ -567,6 +775,7 @@ class CommandParser:
         room_match: dict[str, Any],
         device_match: dict[str, Any],
         value_info: dict[str, Any],
+        property_match: dict[str, Any],
         time_info: dict[str, Any],
     ) -> tuple[float, dict[str, float]]:
         base_score = min(0.45 + score * 0.06, 0.92)
@@ -579,7 +788,9 @@ class CommandParser:
             room_bonus = 0.04 if room_match.get("match_type") == "fuzzy" else 0.06
         if device_match.get("device_type"):
             device_bonus = 0.04 if device_match.get("match_type") == "fuzzy" else 0.06
-        if intent in {"set_temperature", "set_brightness", "set_volume"} and value_info.get("value") is not None:
+        if intent in {"set_temperature", "set_brightness", "set_volume", "set_property"} and (
+            value_info.get("value") is not None or property_match.get("property_value") is not None
+        ):
             value_bonus = 0.05
         if intent == "create_reminder" and time_info.get("value"):
             value_bonus = 0.05

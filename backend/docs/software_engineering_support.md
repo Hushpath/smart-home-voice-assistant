@@ -45,24 +45,26 @@
 1. 输入来源可以是云端 ASR transcript、浏览器 Web Speech API 识别文本或文本输入。
 2. 后端读取当前用户偏好；请求未显式传入 `dialect` 时，使用 `user_preferences.preferred_dialect` 作为默认方言模式。
 3. 后端读取当前用户 `device_aliases`；命中设备别名时，优先绑定真实 `device_id`，并在日志上下文记录 `alias_match`。
-4. `DialectNormalizer` 对方言词汇、粤语词、识别文本常见错词、口语词和中文数字做归一，并保留 normalization detail。
-5. `MultiCommandParser` 对常见多指令句式做规则拆分和上下文继承，例如“打开客厅灯和空调”“打开卧室空调并调到26度”，并过滤包含关系设备名，避免把“台灯”“床头灯”拆成普通“灯”。
-6. 拆分后的单条文本交给 `CommandParser`，对动作词、设备词、房间词、参数词、场景/天气/提醒关键词做意图打分。
-7. 房间和设备先做精确匹配，再做规则别名匹配，最后用 `difflib.SequenceMatcher` 做轻量模糊匹配；用户设备别名优先于普通设备词匹配。
-8. 解析成功返回 `intent`、`room`、`device_type`、`value`、`scene`、`reminder_time`、`reminder_content`、`city`、`confidence`、`matched_keywords`、`match_type` 和 `parse_detail` 等结构化字段；`parse_detail.confidence_breakdown` 用于解释 Parser 置信度来源。
-9. 批量解析返回 `is_batch`、`command_count` 和 `sub_commands`；歧义子指令会标记 `valid=false`，避免误执行。
-10. 低置信度设备控制类指令返回明确提示，不执行设备控制。
-11. 解析失败返回统一错误码 `INVALID_COMMAND`。
+4. `ASRPostCorrector` 基于固定错词和当前用户的房间、设备、别名、场景、参数能力表生成领域词表，保守修正常见 ASR 错字，并记录 `asr_post_correction`。
+5. `DialectNormalizer` 对方言词汇、粤语词、识别文本常见错词、口语词和中文数字做归一，并保留 normalization detail。
+6. `MultiCommandParser` 对常见多指令句式做规则拆分和上下文继承，例如“打开客厅灯和空调”“打开卧室空调并调到26度”，并过滤包含关系设备名，避免把“台灯”“床头灯”拆成普通“灯”。
+7. 拆分后的单条文本交给 `CommandParser`，对动作词、设备词、房间词、参数词、场景/天气/提醒关键词做意图打分。
+8. 房间和设备先做精确匹配，再做规则别名匹配，最后用 `difflib.SequenceMatcher` 做轻量模糊匹配；用户设备别名优先于普通设备词匹配。
+9. 设备参数通过 `device_capabilities.py` 做能力表匹配和校验，支持数值型和枚举型属性。
+10. 解析成功返回 `intent`、`room`、`device_type`、`value`、`property_name`、`property_value`、`scene`、`reminder_time`、`reminder_content`、`city`、`confidence`、`matched_keywords`、`match_type` 和 `parse_detail` 等结构化字段；`parse_detail.confidence_breakdown` 用于解释 Parser 置信度来源。
+11. 批量解析返回 `is_batch`、`command_count` 和 `sub_commands`；歧义子指令会标记 `valid=false`，避免误执行。
+12. 低置信度设备控制类指令返回明确提示，不执行设备控制。
+13. 解析失败返回统一错误码 `INVALID_COMMAND`。
 
 ## 指令执行流程
 
 1. 前端调用 `POST /api/commands/execute` 并携带 JWT。
-2. 后端先读取用户偏好和设备别名，再经过方言归一、多指令拆分和 `CommandParser`，得到结构化解析结果。
-3. `CommandExecutor` 根据 `intent` 执行业务动作；批量指令逐条执行，支持部分成功，不做整体回滚。
+2. 后端先读取用户偏好和设备别名，再经过 ASR 后纠错、方言归一、多指令拆分和 `CommandParser`，得到结构化解析结果。
+3. `CommandExecutor` 根据 `intent` 执行业务动作；设备参数修改统一通过设备能力表校验，批量指令逐条执行，支持部分成功，不做整体回滚。
 4. 设备控制类指令会查询目标房间和设备；如果命中用户设备别名，则按 `alias_match.device_id` 精确控制。
 5. 设备状态变化写入 `devices`，并同步写入 `device_status_history`。
 6. 提醒指令写入 `reminders`；天气指令优先查询 Open-Meteo，失败时读取本地备用天气；场景指令读取 `scene_actions` 批量修改设备。
-7. 无论成功或失败，均写入 `command_logs`；一次语音或批量执行只写一条日志，并在 JSON detail 中保留 ASR、方言归一、个性化命中、解析和执行链路。
+7. 无论成功或失败，均写入 `command_logs`；一次语音或批量执行只写一条日志，并在 JSON detail 中保留 ASR、ASR 后纠错、方言归一、个性化命中、解析和执行链路。
 8. 接口返回统一响应结构，成功时包含解析结果和执行结果，失败时包含错误码和错误信息。
 
 ## 可用于测试报告的测试点
@@ -72,8 +74,8 @@
 - 未携带 JWT 访问受保护接口返回 `UNAUTHORIZED`。
 - 查询房间、设备和 dashboard 返回初始化数据。
 - 修改设备状态后数据库持久化，且写入设备状态历史。
-- 中文指令解析覆盖开关、温度、亮度、音量、状态查询、场景、提醒和天气；新增设备类型仍复用同一解析和执行链路。
-- 方言/口音容错覆盖粤语重点词、西南和东北/北方口语、中文数字参数、设备别名和少量识别误差。
+- 中文指令解析覆盖开关、设备参数调节、状态查询、场景、提醒和天气；新增设备参数优先进入设备能力表。
+- ASR 后纠错和方言/口音容错覆盖动态领域词表、粤语重点词、西南和东北/北方口语、中文数字参数、设备别名和少量识别误差。
 - 用户偏好接口覆盖默认创建、局部更新和非法方言校验。
 - 默认方言和默认输入方式自动学习建议基于当前用户成功日志统计，达到阈值后返回可应用建议。
 - 设备别名接口覆盖新增、重复别名拒绝、删除和按当前用户隔离。
@@ -81,9 +83,9 @@
 - 常用指令推荐基于当前用户成功日志返回高频指令。
 - 多指令解析覆盖常见连接词、上下文继承、部分成功和歧义子指令保护。
 - 解析结果包含 `confidence`、`confidence_breakdown`、`intent_scores`、关键词匹配和参数抽取详情。
-- 中文指令、语音指令和批量指令执行后写入 `command_logs`，日志详情包含 `trace_id`、ASR、normalization、parse、batch 和 execution 信息。
+- 中文指令、语音指令和批量指令执行后写入 `command_logs`，日志详情包含 `trace_id`、ASR、ASR 后纠错、normalization、parse、batch 和 execution 信息。
 - 设备控制指令写入 `device_status_history`。
-- 温度、亮度、音量越界返回 `VALUE_OUT_OF_RANGE`。
+- 数值型设备参数越界返回 `VALUE_OUT_OF_RANGE`；枚举型参数不支持时返回明确错误。
 - 不存在房间返回 `ROOM_NOT_FOUND`，不存在设备返回 `DEVICE_NOT_FOUND`。
 - 不支持的设备操作返回 `UNSUPPORTED_ACTION`。
 - 提醒 CRUD 可用，但不触发后台通知。
@@ -95,7 +97,7 @@
 系统采用分层后端结构：
 
 - 表现层：FastAPI 路由负责 HTTP 请求、鉴权依赖和统一响应。
-- 业务层：服务类负责 ASR Provider、方言/口音容错、多指令拆分、中文指令解析、指令执行、设备状态修改、场景执行、真实天气查询和本地备用天气。
+- 业务层：服务类负责 ASR Provider、ASR 后纠错、方言/口音容错、多指令拆分、中文指令解析、设备能力校验、指令执行、设备状态修改、场景执行、真实天气查询和本地备用天气。
 - 数据访问层：SQLAlchemy ORM 负责 SQLite 数据持久化。
 - 安全层：PBKDF2-SHA256 保存密码哈希，JWT 负责业务接口鉴权。
 

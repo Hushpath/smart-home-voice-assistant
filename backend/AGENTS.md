@@ -10,10 +10,12 @@
 
 ```text
 云端 ASR 音频 / 浏览器识别文本 / 文本输入
+→ ASRPostCorrector
 → DialectNormalizer
 → user_preferences / device_aliases context
 → MultiCommandParser
 → CommandParser
+→ device_capabilities 校验
 → CommandExecutor
 ```
 
@@ -50,6 +52,7 @@
 
 ## 指令与日志
 
+- ASR 后纠错位于 `app/services/asr_post_corrector.py`，只做领域词表内的保守文本修正，并记录 `asr_post_correction`。
 - 方言容错位于 `app/services/dialect_normalizer.py`，不直接决定业务执行。
 - 方言词典替换必须最长匹配优先。
 - `/api/commands/parse` 和 `/api/commands/execute` 请求体 `{ "command": "..." }` 保持兼容。
@@ -58,7 +61,7 @@
 - 默认方言应进入 `CommandExecutor` context，并记录到日志详情。
 - 默认方言和默认输入方式自动学习只能基于当前用户成功日志给出建议，不要静默修改用户配置。
 - 多指令解析和批量执行在后端完成，单条指令响应结构保持兼容。
-- 温度范围保持 `16-30`，亮度和音量范围保持 `0-100`；越界不得执行设备状态修改。
+- 设备参数能力以 `app/services/device_capabilities.py` 为准；数值越界或枚举值不支持时不得执行设备状态修改。
 - 低置信度设备控制类指令不得强行执行。
 - `CommandExecutor` 优先作为唯一日志写入入口，通过 context 记录 trace_id、ASR、normalization、parse 和 execution 信息。
 

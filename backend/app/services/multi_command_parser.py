@@ -16,7 +16,7 @@ from app.services.dialect_normalizer import DialectNormalizer, normalize_and_par
 SEQUENCE_CONNECTOR_PATTERN = re.compile(r"(?:并且|然后|接着|之后|随后|顺便|同时|并|再|，|,|；|;|。)")
 ACTION_WORDS = ("打开", "关闭")
 SET_WORDS = ("设置", "调到", "调成", "调整到")
-STATE_CHANGING_INTENTS = {"turn_on", "turn_off", "set_temperature", "set_brightness", "set_volume"}
+STATE_CHANGING_INTENTS = {"turn_on", "turn_off", "set_temperature", "set_brightness", "set_volume", "set_property"}
 
 
 @dataclass

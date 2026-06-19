@@ -1,5 +1,7 @@
-import httpx
+import json
 from types import SimpleNamespace
+
+import httpx
 
 
 def audio_file(content: bytes = b"fake audio", content_type: str = "audio/wav"):
@@ -217,6 +219,7 @@ def test_xunfei_rejects_webm_without_calling_provider(client, auth_headers, monk
 def test_xunfei_success_uses_websocket_and_parses_words(client, auth_headers, monkeypatch):
     configure_xunfei(monkeypatch)
     sent_frames = []
+    frame_intervals = []
     opened = {}
 
     class FakeWebSocket:
@@ -246,11 +249,12 @@ def test_xunfei_success_uses_websocket_and_parses_words(client, auth_headers, mo
         WebSocketTimeoutException=TimeoutError,
     )
     monkeypatch.setitem(__import__("sys").modules, "websocket", fake_websocket)
+    monkeypatch.setattr("app.services.asr_providers.cloud_provider.time.sleep", frame_intervals.append)
 
     response = client.post(
         "/api/voice/execute",
         headers=auth_headers,
-        files=audio_file(b"fake mp3 audio", "audio/mpeg"),
+        files=audio_file(b"fake mp3 audio" * 200, "audio/mpeg"),
     )
 
     assert response.status_code == 200
@@ -260,3 +264,12 @@ def test_xunfei_success_uses_websocket_and_parses_words(client, auth_headers, mo
     assert "authorization=" in opened["url"]
     assert opened["timeout"] == 1.0
     assert sent_frames
+    first_frame = json.loads(sent_frames[0])
+    assert first_frame["data"]["status"] == 0
+    assert first_frame["business"] == {
+        "language": "zh_cn",
+        "domain": "iat",
+        "accent": "mandarin",
+        "vinfo": 1,
+    }
+    assert all(interval == 0.04 for interval in frame_intervals)

@@ -16,6 +16,7 @@ from app.services.asr_config_store import (
     required_xunfei_fields_missing,
     save_asr_file_config,
 )
+from app.services.asr_post_corrector import correct_asr_text
 from app.services.command_executor import CommandExecutor
 from app.services.home_actions import BusinessError
 from app.services.personalization import get_or_create_preferences
@@ -132,8 +133,9 @@ async def recognize_voice(
     except ASRProviderError as exc:
         raise _asr_http_exception(exc, trace_id) from exc
 
+    correction = correct_asr_text(result.transcript, db=db, user=current_user)
     return success_response(
-        data=_serialize_recognition(result, trace_id, audio.content_type if audio else None),
+        data=_serialize_recognition(result, trace_id, audio.content_type if audio else None, correction.to_dict()),
         message="语音识别成功",
     )
 
@@ -161,15 +163,18 @@ async def execute_voice(
     except ASRProviderError as exc:
         raise _asr_http_exception(exc, trace_id) from exc
 
+    correction = correct_asr_text(recognition.transcript, db=db, user=current_user)
     context = _build_voice_context(recognition, trace_id, audio)
     context["dialect"] = dialect
+    if correction.changed:
+        context["asr_post_correction"] = correction.to_dict()
     executor = CommandExecutor(db=db, user=current_user)
     try:
         execution = executor.execute(recognition.transcript, context=context)
     except BusinessError as exc:
         data = {
             "trace_id": trace_id,
-            "recognition": _serialize_recognition(recognition, trace_id, audio.content_type if audio else None),
+            "recognition": _serialize_recognition(recognition, trace_id, audio.content_type if audio else None, correction.to_dict()),
             "parser_or_execution": exc.data,
         }
         raise HTTPException(
@@ -179,7 +184,7 @@ async def execute_voice(
 
     data = {
         "trace_id": trace_id,
-        "recognition": _serialize_recognition(recognition, trace_id, audio.content_type if audio else None),
+        "recognition": _serialize_recognition(recognition, trace_id, audio.content_type if audio else None, correction.to_dict()),
         "execution": execution,
     }
     if execution.get("is_batch") and execution.get("code") != "OK":
@@ -227,8 +232,9 @@ def _serialize_recognition(
     result: ASRRecognitionResult,
     trace_id: str,
     content_type: str | None,
+    correction: dict | None = None,
 ) -> dict:
-    return {
+    data = {
         "trace_id": trace_id,
         "provider": result.provider,
         "transcript": result.transcript,
@@ -239,6 +245,10 @@ def _serialize_recognition(
         "raw_result": result.raw_result,
         "error": result.error,
     }
+    if correction:
+        data["corrected_transcript"] = correction.get("corrected_text") or result.transcript
+        data["asr_post_correction"] = correction
+    return data
 
 
 def _build_voice_context(
