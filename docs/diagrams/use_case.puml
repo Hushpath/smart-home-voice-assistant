@@ -1,0 +1,47 @@
+@startuml
+left to right direction
+actor "未登录访客" as Guest
+actor "家庭用户" as User
+actor "配置维护用户" as ConfigUser
+rectangle "智能家居语音交互助手系统" {
+  usecase "注册账号" as UC_Register
+  usecase "登录系统" as UC_Login
+  usecase "查看家庭概览" as UC_Dashboard
+  usecase "查看房间和设备" as UC_DeviceList
+  usecase "手动控制虚拟设备" as UC_DeviceControl
+  usecase "查看设备历史" as UC_DeviceHistory
+  usecase "执行自然语言指令" as UC_NaturalCommand
+  usecase "使用云端语音识别" as UC_CloudSpeech
+  usecase "使用浏览器语音识别" as UC_BrowserSpeech
+  usecase "使用文本输入兜底" as UC_TextFallback
+  usecase "查看操作日志详情" as UC_Logs
+  usecase "管理提醒" as UC_Reminders
+  usecase "执行场景模式" as UC_Scenes
+  usecase "查询天气" as UC_Weather
+  usecase "维护个性化偏好" as UC_Preferences
+  usecase "维护设备别名" as UC_Aliases
+  usecase "检查语音识别配置状态" as UC_SpeechConfig
+}
+Guest --> UC_Register
+Guest --> UC_Login
+User --> UC_Dashboard
+User --> UC_DeviceList
+User --> UC_DeviceControl
+User --> UC_DeviceHistory
+User --> UC_NaturalCommand
+User --> UC_CloudSpeech
+User --> UC_BrowserSpeech
+User --> UC_TextFallback
+User --> UC_Logs
+User --> UC_Reminders
+User --> UC_Scenes
+User --> UC_Weather
+User --> UC_Preferences
+User --> UC_Aliases
+ConfigUser --> UC_SpeechConfig
+UC_CloudSpeech ..> UC_NaturalCommand : "识别文本进入同一指令理解链路"
+UC_BrowserSpeech ..> UC_NaturalCommand : "识别文本进入同一指令理解链路"
+UC_TextFallback ..> UC_NaturalCommand : "手工文本进入同一指令理解链路"
+UC_DeviceControl ..> UC_DeviceHistory : "形成状态历史"
+UC_NaturalCommand ..> UC_Logs : "形成操作日志"
+@enduml

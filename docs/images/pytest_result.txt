@@ -1,0 +1,26 @@
+============================= test session starts =============================
+platform win32 -- Python 3.12.13, pytest-9.1.0, pluggy-1.6.0
+rootdir: D:\mawjt\Desktop\software\backend
+plugins: anyio-4.13.0
+collected 185 items
+
+tests\test_asr_post_corrector.py ..........                              [  5%]
+tests\test_auth_and_devices.py ............                              [ 11%]
+tests\test_cloud_asr_provider.py ...........                             [ 17%]
+tests\test_command_execute.py ..............................             [ 34%]
+tests\test_command_logs_detail.py ..                                     [ 35%]
+tests\test_command_parse.py ............................................ [ 58%]
+.................                                                        [ 68%]
+tests\test_dialect_normalizer.py ..............                          [ 75%]
+tests\test_multi_command.py ...............                              [ 83%]
+tests\test_personalization.py .............                              [ 90%]
+tests\test_user_data_isolation.py ...                                    [ 92%]
+tests\test_voice.py ..............                                       [100%]
+
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  D:\mawjt\Desktop\software\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 185 passed, 1 warning in 35.25s =======================

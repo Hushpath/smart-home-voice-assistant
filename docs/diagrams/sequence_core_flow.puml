@@ -1,0 +1,37 @@
+@startuml
+actor User
+participant "VoiceControlView.vue" as FE
+participant "commands/voice router" as Router
+participant "CommandExecutor" as Exec
+participant "ASRPostCorrector" as Corrector
+participant "DialectNormalizer" as Normalizer
+participant "MultiCommandParser" as MultiParser
+participant "CommandParser" as Parser
+participant "Home Actions" as Actions
+database "SQLite" as DB
+
+User -> FE: 输入文本/浏览器识别文本/上传音频
+alt 云端 ASR 音频
+  FE -> Router: POST /api/voice/execute
+  Router -> Router: SpeechRecognitionService.recognize()
+else 文本或浏览器识别
+  FE -> Router: POST /api/commands/execute
+end
+Router -> Exec: execute(command, context)
+Exec -> DB: 读取用户偏好、设备别名、房间设备
+Exec -> Corrector: correct_asr_text()
+Corrector --> Exec: corrected_text, corrections
+Exec -> Normalizer: normalize()
+Normalizer --> Exec: normalized_text, detail
+Exec -> MultiParser: parse()
+MultiParser -> Parser: parse sub command(s)
+Parser --> MultiParser: ParseResult
+MultiParser --> Exec: 单条或批量解析结果
+Exec -> Actions: 控制设备/执行场景/创建提醒/查询天气
+Actions -> DB: 更新 devices/reminders/scenes 相关数据
+Actions -> DB: 写入 device_status_history
+Exec -> DB: 写入 command_logs
+Exec --> Router: execution result
+Router --> FE: success/code/message/data
+FE --> User: 展示摘要；详情在日志页查看
+@enduml

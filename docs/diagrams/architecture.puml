@@ -1,0 +1,115 @@
+@startuml
+title 智能家居语音交互助手总体架构
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+
+actor "家庭用户" as User
+
+package "Frontend: Vue 3 + Vite" as FE {
+  [LoginView] as FE_LOGIN
+  [DashboardView] as FE_DASH
+  [DevicesView] as FE_DEV
+  [VoiceControlView] as FE_VOICE
+  [LogsView] as FE_LOGS
+  [RemindersView] as FE_REM
+  [ScenesView] as FE_SCENE
+  [AppLayout + Router Guard] as FE_ROUTER
+  [Axios API Wrappers] as FE_API
+  [Pinia Auth Store] as FE_STORE
+  [Web Speech API\nBrowser text] as WEB_SPEECH
+}
+
+package "Backend: FastAPI /api" as BE {
+  [auth router] as R_AUTH
+  [devices router] as R_DEV
+  [commands router] as R_CMD
+  [voice router] as R_VOICE
+  [user router] as R_USER
+  [reminders router] as R_REM
+  [weather router] as R_WEATHER
+  [scenes router] as R_SCENE
+  [JWT Security] as SECURITY
+  [Unified Response] as RESPONSE
+  [SpeechRecognitionService] as ASR_SERVICE
+  [CloudASRProvider] as CLOUD_ASR
+  [MockASRProvider\nTest/local only] as MOCK_ASR
+  [ASRPostCorrector] as CORRECTOR
+  [DialectNormalizer] as NORMALIZER
+  [MultiCommandParser] as MULTI
+  [CommandParser] as PARSER
+  [device_capabilities] as CAP
+  [CommandExecutor] as EXEC
+  [Personalization Service] as PERSONAL
+  [Home Actions] as HOME_ACTIONS
+}
+
+database "SQLite\nbackend/data/app.db" as DB
+file "ASR local config\nbackend/data/asr_config.json" as ASR_CONFIG
+cloud "Xunfei WebAPI\noptional cloud ASR" as XUNFEI
+cloud "Generic cloud ASR\ncustom proxy" as GENERIC_ASR
+cloud "Open-Meteo\nweather" as OPEN_METEO
+
+User --> FE_LOGIN
+User --> FE_DASH
+User --> FE_DEV
+User --> FE_VOICE
+User --> FE_LOGS
+User --> FE_REM
+User --> FE_SCENE
+
+FE_ROUTER --> FE_STORE
+FE_LOGIN --> FE_API
+FE_DASH --> FE_API
+FE_DEV --> FE_API
+FE_VOICE --> FE_API
+FE_LOGS --> FE_API
+FE_REM --> FE_API
+FE_SCENE --> FE_API
+FE_VOICE --> WEB_SPEECH
+WEB_SPEECH --> FE_API : recognized text
+FE_API --> R_AUTH
+FE_API --> R_DEV
+FE_API --> R_CMD
+FE_API --> R_VOICE
+FE_API --> R_USER
+FE_API --> R_REM
+FE_API --> R_WEATHER
+FE_API --> R_SCENE
+
+R_AUTH --> SECURITY
+R_AUTH --> DB
+R_DEV --> DB
+R_USER --> PERSONAL
+R_REM --> DB
+R_SCENE --> HOME_ACTIONS
+R_WEATHER --> HOME_ACTIONS
+R_CMD --> EXEC
+R_VOICE --> ASR_SERVICE
+R_VOICE --> EXEC
+R_VOICE --> ASR_CONFIG
+ASR_SERVICE --> CLOUD_ASR
+ASR_SERVICE --> MOCK_ASR
+CLOUD_ASR --> ASR_CONFIG
+CLOUD_ASR --> XUNFEI
+CLOUD_ASR --> GENERIC_ASR
+EXEC --> PERSONAL
+EXEC --> CORRECTOR
+EXEC --> NORMALIZER
+EXEC --> MULTI
+MULTI --> PARSER
+PARSER --> CAP
+EXEC --> CAP
+EXEC --> HOME_ACTIONS
+HOME_ACTIONS --> DB
+HOME_ACTIONS --> OPEN_METEO
+EXEC --> DB : command_logs / device_status_history
+PERSONAL --> DB
+RESPONSE .. R_AUTH
+RESPONSE .. R_DEV
+RESPONSE .. R_CMD
+RESPONSE .. R_VOICE
+RESPONSE .. R_USER
+RESPONSE .. R_REM
+RESPONSE .. R_WEATHER
+RESPONSE .. R_SCENE
+@enduml

@@ -1,0 +1,117 @@
+@startuml
+entity homes {
+  * id : Integer
+  --
+  name : String
+  address : String
+  created_at : DateTime
+}
+entity users {
+  * id : Integer
+  --
+  username : String
+  password_hash : String
+  nickname : String
+  home_id : FK
+  is_active : Boolean
+  created_at : DateTime
+}
+entity rooms {
+  * id : Integer
+  --
+  name : String
+  home_id : FK
+  created_at : DateTime
+}
+entity devices {
+  * id : Integer
+  --
+  name : String
+  device_type : String
+  room_id : FK
+  is_on : Boolean
+  is_online : Boolean
+  properties : JSON
+  created_at : DateTime
+  updated_at : DateTime
+}
+entity command_logs {
+  * id : Integer
+  --
+  user_id : FK nullable
+  raw_command : Text
+  parsed_result : JSON
+  execution_result : JSON
+  success : Boolean
+  error_message : Text
+  created_at : DateTime
+}
+entity device_status_history {
+  * id : Integer
+  --
+  device_id : FK
+  user_id : FK nullable
+  before_state : JSON
+  after_state : JSON
+  change_source : String
+  created_at : DateTime
+}
+entity user_preferences {
+  * id : Integer
+  --
+  user_id : FK unique
+  preferred_dialect : String
+  preferred_input_mode : String
+  created_at : DateTime
+  updated_at : DateTime
+}
+entity device_aliases {
+  * id : Integer
+  --
+  user_id : FK
+  device_id : FK
+  alias : String
+  created_at : DateTime
+  updated_at : DateTime
+}
+entity reminders {
+  * id : Integer
+  --
+  user_id : FK
+  title : String
+  remind_time : DateTime
+  is_done : Boolean
+  created_at : DateTime
+  updated_at : DateTime
+}
+entity scenes {
+  * id : Integer
+  --
+  home_id : FK
+  name : String
+  description : String
+  created_at : DateTime
+}
+entity scene_actions {
+  * id : Integer
+  --
+  scene_id : FK
+  device_id : FK
+  action : String
+  target_state : JSON
+  sort_order : Integer
+}
+homes ||--o{ users
+homes ||--o{ rooms
+homes ||--o{ scenes
+rooms ||--o{ devices
+users ||--o{ command_logs
+users ||--o{ reminders
+users ||--|| user_preferences
+users ||--o{ device_aliases
+devices ||--o{ device_aliases
+devices ||--o{ device_status_history
+users ||--o{ device_status_history
+scenes ||--o{ scene_actions
+devices ||--o{ scene_actions
+@enduml

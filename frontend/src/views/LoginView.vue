@@ -9,7 +9,7 @@
       <p class="login-eyebrow">Smart home voice interaction</p>
       <h1>用一句中文指令，控制整套虚拟家居。</h1>
       <p class="login-summary">
-        前端接入 FastAPI 后端，完成 JWT 登录后进入统一控制台。当前阶段只实现认证、路由、布局和页面骨架。
+        前端接入 FastAPI 后端，完成 JWT 登录后进入智能家居控制台，演示虚拟设备、语音/文本指令、日志、提醒和场景。
       </p>
       <div class="demo-commands">
         <span>打开客厅灯</span>

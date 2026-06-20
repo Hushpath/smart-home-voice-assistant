@@ -1,0 +1,36 @@
+@startuml
+title 操作日志与可解释追踪顺序图
+actor "家庭用户" as User
+participant "VoiceControlView.vue" as VoiceView
+participant "LogsView.vue" as LogsView
+participant "LogDetailDrawer.vue" as Drawer
+participant "command.js" as CommandAPI
+participant "commands router" as Router
+participant "CommandExecutor" as Exec
+database "SQLite command_logs" as Logs
+database "SQLite device_status_history" as History
+
+User -> VoiceView: 执行语音/文本指令
+VoiceView -> CommandAPI: POST /api/commands/execute or /api/voice/execute
+CommandAPI -> Router: request
+Router -> Exec: execute(command, context)
+Exec -> Logs: write parsed_result + execution_result + context
+Exec -> History: write device history if state changed
+Exec --> Router: trace_id + summary
+Router --> CommandAPI: success/code/message/data
+CommandAPI --> VoiceView: show summary
+VoiceView --> User: 查看日志详情入口
+
+User -> VoiceView: 点击查看日志详情
+VoiceView -> LogsView: route /logs?trace_id=...
+LogsView -> CommandAPI: GET /api/commands/logs
+CommandAPI -> Router: list logs
+Router -> Logs: query current user command_logs
+Logs --> Router: raw logs
+Router --> CommandAPI: normalized summary + detail blocks
+CommandAPI --> LogsView: log array
+LogsView -> LogsView: filter by trace_id
+User -> LogsView: 打开详情抽屉
+LogsView -> Drawer: selected log
+Drawer --> User: ASR / normalization / parse / batch / personalization / execution / raw
+@enduml

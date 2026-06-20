@@ -1,0 +1,42 @@
+@startuml
+title 手动设备控制、场景执行与状态历史顺序图
+actor "家庭用户" as User
+participant "DevicesView.vue / ScenesView.vue" as FE
+participant "device.js / scene.js" as API
+participant "devices router / scenes router" as Router
+participant "get_current_user" as Auth
+participant "home_actions.apply_device_state" as Actions
+database "SQLite devices" as Devices
+database "SQLite device_status_history" as History
+database "SQLite scenes / scene_actions" as Scenes
+
+alt 手动控制设备
+  User -> FE: 切换开关或保存参数
+  FE -> API: PATCH /api/devices/{device_id}/state
+  API -> Router: is_on/is_online/properties
+  Router -> Auth: 校验 Bearer token
+  Router -> Devices: 查询当前家庭设备
+  Router -> Devices: 更新 devices 状态
+  Router -> History: 写 before_state / after_state / change_source=manual
+  Router --> API: 修改后设备
+  API --> FE: 刷新设备列表
+else 执行场景
+  User -> FE: 点击执行场景
+  FE -> API: POST /api/scenes/{scene_id}/run
+  API -> Router: scene_id
+  Router -> Auth: 校验 Bearer token
+  Router -> Scenes: 查询当前家庭场景和动作
+  loop scene_actions sort_order
+    Router -> Actions: apply_device_state(target_state, source=scene)
+    Actions -> Devices: 更新虚拟设备状态
+    Actions -> History: 写状态历史
+  end
+  Router --> API: scene + changes
+  API --> FE: 显示影响设备
+end
+
+alt 设备或场景不存在
+  Router --> API: DEVICE_NOT_FOUND / SCENE_NOT_FOUND
+  API --> FE: 展示失败提示
+end
+@enduml

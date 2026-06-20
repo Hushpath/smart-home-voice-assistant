@@ -1,0 +1,32 @@
+@startuml
+start
+:准备测试环境;
+:后端 pytest 使用临时 SQLite 和 TestClient;
+:禁用真实天气请求，使用 mock fallback;
+:运行 python -m pytest;
+if (pytest 通过?) then (182 passed)
+  :记录 docs/images/pytest_result.txt;
+  :生成 docs/images/test_result.png;
+else (失败)
+  :记录失败项和原因;
+endif
+:运行 npm run build;
+if (构建成功?) then (成功，有警告)
+  :记录 docs/images/frontend_build.txt;
+  :生成 docs/images/frontend_build.png;
+else (失败)
+  :记录构建错误;
+endif
+:运行 python scripts/smoke_test.py;
+if (smoke 通过?) then (通过)
+  :覆盖健康检查、登录、Dashboard、设备、语音 provider、指令、日志、历史;
+  :记录 docs/images/smoke_test_result.txt;
+  :生成 docs/images/smoke_test_result.png;
+else (失败)
+  :记录失败步骤;
+endif
+:启动本地前后端;
+:浏览器登录 testuser/test123456;
+:截取登录、Dashboard、语音、设备、日志、提醒、场景页面;
+stop
+@enduml

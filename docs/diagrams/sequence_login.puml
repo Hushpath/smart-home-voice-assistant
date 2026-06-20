@@ -1,0 +1,41 @@
+@startuml
+title 登录与受保护页面鉴权顺序图
+actor "用户" as User
+participant "LoginView.vue" as Login
+participant "authStore" as Store
+participant "auth.js / request.js" as API
+participant "auth router" as AuthRouter
+participant "JWT Security" as Security
+database "SQLite users" as DB
+participant "Vue Router Guard" as Guard
+participant "Protected View" as View
+
+User -> Login: 输入 username/password
+Login -> Store: login(credentials)
+Store -> API: POST /api/auth/login
+API -> AuthRouter: JSON username/password
+AuthRouter -> DB: 查询用户
+AuthRouter -> Security: verify_password()
+Security --> AuthRouter: valid
+AuthRouter -> Security: create_access_token(user.id)
+Security --> AuthRouter: access_token
+AuthRouter --> API: success data token/user
+API --> Store: token/user
+Store -> Store: 保存 localStorage
+Store --> Login: session
+Login -> Guard: router.replace(/dashboard)
+Guard -> Store: isAuthenticated?
+Guard -> Store: fetchCurrentUser if needed
+Store -> API: GET /api/auth/me
+API -> AuthRouter: Authorization Bearer token
+AuthRouter -> Security: decode_access_token()
+Security --> AuthRouter: sub/exp
+AuthRouter -> DB: 查询 active user
+AuthRouter --> API: current user
+API --> Store: user
+Guard --> View: 放行受保护页面
+
+alt token 缺失或无效
+  Guard --> Login: redirect /login
+end
+@enduml

@@ -1,0 +1,120 @@
+@startuml
+title 后端核心模块与数据对象关系
+skinparam classAttributeIconSize 0
+
+package "routers" {
+  class "auth.py" as AuthRouter
+  class "devices.py" as DevicesRouter
+  class "commands.py" as CommandsRouter
+  class "voice.py" as VoiceRouter
+  class "user.py" as UserRouter
+  class "reminders.py" as RemindersRouter
+  class "weather.py" as WeatherRouter
+  class "scenes.py" as ScenesRouter
+  class "health.py" as HealthRouter
+}
+
+package "schemas" {
+  class UserRegisterRequest
+  class UserLoginRequest
+  class DeviceStateUpdateRequest
+  class CommandParseRequest
+  class CommandExecuteRequest
+  class ReminderCreateRequest
+  class ReminderUpdateRequest
+  class UserPreferenceUpdateRequest
+  class DeviceAliasCreateRequest
+  class ASRConfigUpdateRequest
+}
+
+package "services" {
+  class CommandExecutor
+  class CommandParser
+  class MultiCommandParser
+  class DialectNormalizer
+  class ASRPostCorrector
+  class SpeechRecognitionService
+  interface ASRProvider
+  class CloudASRProvider
+  class MockASRProvider
+  class "device_capabilities.py" as DeviceCapabilities
+  class "personalization.py" as Personalization
+  class "home_actions.py" as HomeActions
+  class "asr_config_store.py" as ASRConfigStore
+}
+
+package "core/db" {
+  class Settings
+  class JWTSecurity
+  class get_current_user
+  class SessionLocal
+}
+
+package "models" {
+  class Home
+  class User
+  class Room
+  class Device
+  class DeviceStatusHistory
+  class CommandLog
+  class Reminder
+  class Scene
+  class SceneAction
+  class UserPreference
+  class DeviceAlias
+}
+
+HealthRouter --> Settings
+AuthRouter --> UserRegisterRequest
+AuthRouter --> UserLoginRequest
+AuthRouter --> JWTSecurity
+AuthRouter --> User
+DevicesRouter --> DeviceStateUpdateRequest
+DevicesRouter --> Room
+DevicesRouter --> Device
+DevicesRouter --> DeviceStatusHistory
+CommandsRouter --> CommandParseRequest
+CommandsRouter --> CommandExecuteRequest
+CommandsRouter --> CommandExecutor
+CommandsRouter --> CommandParser
+CommandsRouter --> MultiCommandParser
+VoiceRouter --> ASRConfigUpdateRequest
+VoiceRouter --> SpeechRecognitionService
+VoiceRouter --> ASRConfigStore
+VoiceRouter --> CommandExecutor
+UserRouter --> UserPreferenceUpdateRequest
+UserRouter --> DeviceAliasCreateRequest
+UserRouter --> Personalization
+RemindersRouter --> ReminderCreateRequest
+RemindersRouter --> ReminderUpdateRequest
+RemindersRouter --> Reminder
+WeatherRouter --> HomeActions
+ScenesRouter --> HomeActions
+ScenesRouter --> Scene
+
+CommandExecutor --> Personalization
+CommandExecutor --> ASRPostCorrector
+CommandExecutor --> DialectNormalizer
+CommandExecutor --> MultiCommandParser
+CommandExecutor --> DeviceCapabilities
+CommandExecutor --> HomeActions
+CommandExecutor --> CommandLog
+CommandExecutor --> Reminder
+MultiCommandParser --> DialectNormalizer
+MultiCommandParser --> CommandParser
+CommandParser --> DeviceCapabilities
+SpeechRecognitionService --> ASRProvider
+ASRProvider <|.. CloudASRProvider
+ASRProvider <|.. MockASRProvider
+CloudASRProvider --> ASRConfigStore
+Personalization --> UserPreference
+Personalization --> DeviceAlias
+Personalization --> CommandLog
+HomeActions --> Device
+HomeActions --> DeviceStatusHistory
+HomeActions --> Scene
+get_current_user --> User
+SessionLocal --> Home
+SessionLocal --> User
+SessionLocal --> Device
+@enduml
