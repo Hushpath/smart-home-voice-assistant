@@ -1,78 +1,57 @@
 @startuml
-title 云端语音、浏览器识别文本和文本输入统一执行顺序图
+title 三类输入进入统一指令执行链路（简化视图）
 actor "家庭用户" as User
 participant "VoiceControlView.vue" as FE
 participant "voice.js / command.js" as API
-participant "voice router" as VoiceRouter
-participant "commands router" as CommandRouter
-participant "SpeechRecognitionService" as ASRService
-participant "CloudASRProvider" as CloudASR
+participant "voice router / commands router" as Router
+participant "ASR Service + Provider" as ASR
 participant "CommandExecutor" as Exec
-participant "Personalization Service" as Personal
-participant "ASRPostCorrector" as Corrector
-participant "DialectNormalizer" as Normalizer
-participant "MultiCommandParser" as MultiParser
-participant "CommandParser" as Parser
-participant "device_capabilities" as Capabilities
-participant "home_actions" as Actions
+participant "personalization" as Personal
+participant "Text Understanding Pipeline\n纠错 -> 归一 -> 拆分 -> 解析 -> 能力校验" as Pipeline
+participant "Business Services\nhome_actions / reminders / weather / scenes" as Biz
 database "SQLite" as DB
 
 alt 云端 ASR 音频
   User -> FE: 录音
-  FE -> API: POST /api/voice/execute multipart audio
-  API -> VoiceRouter: audio + dialect?
-  VoiceRouter -> ASRService: recognize(audio, trace_id)
-  ASRService -> CloudASR: recognize()
-  CloudASR --> ASRService: transcript/raw_result
-  ASRService --> VoiceRouter: ASRRecognitionResult
-  VoiceRouter -> Exec: execute(transcript, voice context)
+  FE -> API: POST /api/voice/execute
+  API -> Router: multipart audio + dialect?
+  Router -> ASR: recognize(audio, trace_id)
+  break 云端 ASR 不可用
+    ASR --> Router: ASRProviderError + fallback
+    Router --> API: error + browser_speech/text_input
+    API --> FE: show fallback suggestion
+  end
+  ASR --> Router: transcript + raw_result
 else 浏览器识别文本
-  User -> FE: Web Speech API 识别文本
+  User -> FE: Web Speech API 得到文本
   FE -> API: POST /api/commands/execute
-  API -> CommandRouter: command text
-  CommandRouter -> Exec: execute(command)
+  API -> Router: command text
 else 手工文本输入
   User -> FE: 输入文本
   FE -> API: POST /api/commands/execute
-  API -> CommandRouter: command text
-  CommandRouter -> Exec: execute(command)
+  API -> Router: command text
 end
 
-Exec -> Personal: get preferences and device aliases
+Router -> Exec: execute(command/transcript, context)
+Exec -> Personal: read preferences and aliases
 Personal -> DB: user_preferences / device_aliases / command_logs
 Personal --> Exec: preference_used / alias_match
-Exec -> Corrector: correct_asr_text(command)
-Corrector -> DB: room/device/alias/scene lexicon
-Corrector --> Exec: corrected_text and corrections
-Exec -> Normalizer: normalize(corrected_text, dialect)
-Normalizer --> Exec: normalized_text and detail
-Exec -> MultiParser: parse(normalized_text)
-MultiParser -> Parser: parse sub command(s)
-Parser -> Capabilities: match and validate property capability
-Capabilities --> Parser: allowed property/range/enum
-Parser --> MultiParser: ParseResult(s)
-MultiParser --> Exec: single or batch result
 
-alt parse valid
-  Exec -> Actions: device/reminder/weather/scene action
-  Actions -> DB: update devices/reminders or query data
-  Actions -> DB: write device_status_history when state changes
-  Exec -> DB: write command_logs once
-  Exec --> VoiceRouter: execution result
-  Exec --> CommandRouter: execution result
-else low confidence or invalid
-  Exec -> DB: write failed command_logs
-  Exec --> VoiceRouter: BusinessError
-  Exec --> CommandRouter: BusinessError
+Exec -> Pipeline: asr_post_correction + normalization + parse
+Pipeline -> DB: rooms / devices / aliases / scenes lexicon
+Pipeline --> Exec: ParseResult(s) + Parser confidence
+
+alt 解析有效
+  Exec -> Biz: execute device/reminder/weather/scene action
+  Biz -> DB: update virtual devices / reminders / scenes
+  Biz -> DB: write device_status_history when state changes
+  Exec -> DB: write one command_logs record
+  Exec --> Router: execution result
+else 低置信度或非法指令
+  Exec -> DB: write failed command_logs record
+  Exec --> Router: BusinessError
 end
 
-VoiceRouter --> API: success/error envelope
-CommandRouter --> API: success/error envelope
-API --> FE: show summary and link to log detail
-
-alt cloud ASR unavailable
-  ASRService --> VoiceRouter: ASRProviderError with fallback
-  VoiceRouter --> API: ASR error + browser_speech/text_input
-  API --> FE: show fallback suggestion
-end
+Router --> API: success/code/message/data
+API --> FE: show summary and log detail entry
 @enduml

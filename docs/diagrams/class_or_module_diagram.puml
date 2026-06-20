@@ -1,5 +1,5 @@
 @startuml
-title 后端核心模块与数据对象关系
+title 后端核心模块依赖图（模块级类图）
 skinparam classAttributeIconSize 0
 
 package "routers" {

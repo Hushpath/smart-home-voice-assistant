@@ -1,49 +1,46 @@
 @startuml
-title 个性化偏好与设备别名参与执行顺序图
+title 个性化偏好与设备别名参与执行顺序图（简化视图）
 actor "家庭用户" as User
-participant "DevicesView.vue" as DevicesView
-participant "VoiceControlView.vue" as VoiceView
-participant "PersonalizationCard.vue" as PersonalCard
-participant "personalization.js" as PersonalAPI
-participant "user router" as UserRouter
+participant "Frontend Views\nPersonalizationCard / DevicesView / VoiceControlView" as FE
+participant "Frontend API\npersonalization.js / command.js" as API
+participant "Backend Router\nuser router / commands router" as Router
 participant "CommandExecutor" as Exec
-participant "personalization.py" as PersonalService
-participant "ASRPostCorrector" as Corrector
-participant "DialectNormalizer" as Normalizer
-participant "CommandParser" as Parser
-database "SQLite user_preferences" as Preferences
-database "SQLite device_aliases" as Aliases
-database "SQLite command_logs" as Logs
+participant "personalization service" as PersonalService
+participant "Text Understanding Pipeline" as Pipeline
+database "SQLite\nuser_preferences / device_aliases / command_logs" as DB
 
-User -> PersonalCard: 保存默认方言或输入方式
-PersonalCard -> PersonalAPI: PATCH /api/user/preferences
-PersonalAPI -> UserRouter: preferred_dialect / preferred_input_mode
-UserRouter -> Preferences: get_or_create then update
-UserRouter --> PersonalAPI: updated preference
-PersonalAPI --> PersonalCard: show saved
+== 偏好维护 ==
+User -> FE: 保存默认方言或输入方式
+FE -> API: PATCH /api/user/preferences
+API -> Router: preferred_dialect / preferred_input_mode
+Router -> DB: get_or_create then update user_preferences
+DB --> Router: updated preference
+Router --> API: success envelope
+API --> FE: show saved
 
-User -> DevicesView: 新建设备别名
-DevicesView -> PersonalAPI: POST /api/user/device-aliases
-PersonalAPI -> UserRouter: device_id + alias
-UserRouter -> Aliases: check same user alias uniqueness
-UserRouter -> Aliases: insert alias
-UserRouter --> PersonalAPI: alias detail
-PersonalAPI --> DevicesView: refresh aliases
+== 设备别名维护 ==
+User -> FE: 新建设备别名
+FE -> API: POST /api/user/device-aliases
+API -> Router: device_id + alias
+Router -> DB: check current-user alias uniqueness
+Router -> DB: insert device_aliases
+DB --> Router: alias detail
+Router --> API: success envelope
+API --> FE: refresh aliases
 
-User -> VoiceView: 执行“打开小灯”
-VoiceView -> Exec: POST /api/commands/execute command
-Exec -> PersonalService: get_or_create_preferences()
-PersonalService -> Preferences: read preference
-PersonalService --> Exec: preferred_dialect
-Exec -> PersonalService: match_device_alias(command)
-PersonalService -> Aliases: query current user aliases
-PersonalService --> Exec: alias_match for target device
-Exec -> Corrector: correct_asr_text(command, dynamic lexicon)
-Corrector --> Exec: corrected text
-Exec -> Normalizer: normalize(dialect from preference)
-Normalizer --> Exec: normalization detail
-Exec -> Parser: parse rewritten room+device command
-Parser --> Exec: ParseResult with alias_match
-Exec -> Logs: write preference_used and alias_match
-Exec --> VoiceView: execution result
+== 个性化参与指令执行 ==
+User -> FE: 执行“打开小灯”
+FE -> API: POST /api/commands/execute
+API -> Router: command text
+Router -> Exec: execute(command, context)
+Exec -> PersonalService: get preferences and match alias
+PersonalService -> DB: read preference and aliases
+DB --> PersonalService: preferred_dialect + alias_match
+PersonalService --> Exec: personalization context
+Exec -> Pipeline: rewrite alias, correct, normalize, parse
+Pipeline --> Exec: ParseResult with alias_match and Parser confidence
+Exec -> DB: write preference_used and alias_match
+Exec --> Router: execution result
+Router --> API: success/code/message/data
+API --> FE: show result
 @enduml

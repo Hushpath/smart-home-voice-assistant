@@ -35,6 +35,18 @@ def test_login_returns_jwt_token(client):
     assert data["user"]["username"] == "testuser"
 
 
+def test_login_rejects_wrong_password(client):
+    response = client.post(
+        "/api/auth/login",
+        json={"username": "testuser", "password": "wrong-password"},
+    )
+
+    assert response.status_code == 401
+    body = response.json()
+    assert body["success"] is False
+    assert body["code"] == "UNAUTHORIZED"
+
+
 def test_get_current_user(client, auth_headers):
     response = client.get("/api/auth/me", headers=auth_headers)
 
@@ -44,6 +56,15 @@ def test_get_current_user(client, auth_headers):
 
 def test_protected_endpoint_requires_token(client):
     response = client.get("/api/rooms")
+
+    assert response.status_code == 401
+    body = response.json()
+    assert body["success"] is False
+    assert body["code"] == "UNAUTHORIZED"
+
+
+def test_protected_endpoint_rejects_invalid_token(client):
+    response = client.get("/api/rooms", headers={"Authorization": "Bearer invalid.token.value"})
 
     assert response.status_code == 401
     body = response.json()

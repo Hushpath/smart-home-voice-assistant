@@ -1,15 +1,21 @@
+COMMAND: cd backend; .\\.venv\\Scripts\\python.exe -m pytest
+FALLBACK_FOR: cd backend; python -m pytest (failed because python was not found in PATH, exit 9009)
+START_TIME: 2026-06-20 17:31:03 +08:00
+END_TIME: 2026-06-20 17:31:43 +08:00
+EXIT_CODE: 0
+
 ============================= test session starts =============================
 platform win32 -- Python 3.12.13, pytest-9.1.0, pluggy-1.6.0
 rootdir: D:\mawjt\Desktop\software\backend
 plugins: anyio-4.13.0
-collected 185 items
+collected 187 items
 
 tests\test_asr_post_corrector.py ..........                              [  5%]
-tests\test_auth_and_devices.py ............                              [ 11%]
-tests\test_cloud_asr_provider.py ...........                             [ 17%]
+tests\test_auth_and_devices.py ..............                            [ 12%]
+tests\test_cloud_asr_provider.py ...........                             [ 18%]
 tests\test_command_execute.py ..............................             [ 34%]
 tests\test_command_logs_detail.py ..                                     [ 35%]
-tests\test_command_parse.py ............................................ [ 58%]
+tests\test_command_parse.py ............................................ [ 59%]
 .................                                                        [ 68%]
 tests\test_dialect_normalizer.py ..............                          [ 75%]
 tests\test_multi_command.py ...............                              [ 83%]
@@ -23,4 +29,4 @@ tests\test_voice.py ..............                                       [100%]
     from starlette.testclient import TestClient as TestClient  # noqa
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-======================= 185 passed, 1 warning in 35.25s =======================
+======================= 187 passed, 1 warning in 38.16s =======================
