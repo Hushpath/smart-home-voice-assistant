@@ -1,82 +1,32 @@
 @startuml
-title 智能家居语音交互助手总体架构（分层视图）
-left to right direction
+title 智能家居语音交互助手总体架构
+top to bottom direction
 skinparam componentStyle rectangle
 skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultFontSize 18
+skinparam titleFontSize 22
+skinparam ArrowFontSize 14
+skinparam packageFontSize 18
 
 actor "家庭用户" as User
 
-package "Frontend: Vue 3 + Vite" as FE {
-  [AppLayout / Router Guard] as Shell
-  [页面视图\nLogin / Dashboard / Devices / Voice / Logs / Reminders / Scenes] as Views
-  [Pinia authStore] as Store
-  [Axios API Wrappers] as APIWrappers
-  [Web Speech API\n浏览器识别文本] as WebSpeech
-  [SpeechSynthesis\n语音反馈] as SpeechSynthesis
-}
+rectangle "前端 Vue 3 + Vite\n页面、组件、路由守卫\nPinia、Axios API 封装\n浏览器语音识别 / 文本输入" as FE
+rectangle "后端 FastAPI /api\nrouter、schema、core\n统一响应与 JWT 鉴权" as API
+rectangle "业务服务层\nASR Service / Provider\n文本理解 Pipeline\nCommandExecutor\npersonalization / home_actions" as Service
+database "SQLite app.db\n用户、家庭、房间、虚拟设备\n日志、历史、提醒、场景、偏好" as DB
+file "asr_config.json\n本地 ASR 配置" as ASRConfig
+cloud "外部服务\n云端 ASR / Open-Meteo" as External
 
-package "Backend: FastAPI /api" as BE {
-  package "Router Layer" {
-    [auth / devices / commands / voice / user\nreminders / weather / scenes / health routers] as Routers
-  }
-
-  package "Core Layer" {
-    [JWT Security] as Security
-    [Unified Response] as Response
-  }
-
-  package "Service Layer" {
-    [SpeechRecognitionService] as ASRService
-    [ASR Providers\nCloud / Mock(test-local)] as Providers
-    [Text Understanding Pipeline\nASRPostCorrector -> DialectNormalizer\n-> MultiCommandParser -> CommandParser] as Pipeline
-    [device_capabilities] as Capabilities
-    [CommandExecutor] as Executor
-    [personalization] as Personalization
-    [home_actions] as HomeActions
-  }
-}
-
-database "SQLite\nbackend/data/app.db\n虚拟设备与业务数据" as DB
-file "ASR local config\nbackend/data/asr_config.json" as ASRConfig
-cloud "Xunfei / generic cloud ASR" as CloudASR
-cloud "Open-Meteo\nweather" as Weather
-
-User --> Views
-Shell --> Views
-Shell --> Store
-Views --> APIWrappers
-Views --> WebSpeech : VoiceControlView
-Views --> SpeechSynthesis : 可选语音反馈
-WebSpeech --> APIWrappers : recognized text
-
-APIWrappers --> Routers : /api JSON or multipart
-Routers --> Security : protected APIs
-Routers ..> Response : success/code/message/data
-Routers --> ASRService : voice audio
-Routers --> Executor : command text / transcript
-Routers --> Personalization : user preference APIs
-Routers --> HomeActions : device / scene / weather APIs
-
-ASRService --> Providers
-Providers --> ASRConfig
-Providers --> CloudASR
-
-Executor --> Personalization
-Executor --> Pipeline
-Pipeline --> Capabilities
-Executor --> HomeActions
-Executor --> DB : command_logs
-Personalization --> DB : preferences / aliases / statistics
-HomeActions --> DB : devices / reminders / scenes / history
-HomeActions --> Weather
-
-note right of Providers
-  MockASRProvider only supports
-  pytest, smoke test, and local testing.
-end note
+User --> FE
+FE --> API : /api JSON / multipart
+API --> Service
+Service --> DB : 读写业务数据
+Service --> ASRConfig : 读取配置
+Service --> External : ASR / 天气
 
 note bottom of DB
-  Device state is virtual database state,
-  not real smart-home hardware state.
+  当前设备状态是虚拟设备状态，
+  不代表真实硬件状态。
 end note
 @enduml

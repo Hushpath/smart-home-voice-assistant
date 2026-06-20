@@ -1,121 +1,28 @@
 @startuml
-title 后端分层模块图（真实代码承接）
+title 后端分层模块图
+top to bottom direction
 skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultFontSize 18
+skinparam titleFontSize 22
+skinparam ArrowFontSize 14
+skinparam packageFontSize 18
 
-package "HTTP Router Layer" {
-  [health router]
-  [auth router]
-  [devices router]
-  [commands router]
-  [voice router]
-  [user router]
-  [reminders router]
-  [weather router]
-  [scenes router]
-}
-
-package "Schema Layer" {
-  [auth schemas]
-  [device schemas]
-  [command schemas]
-  [voice schemas]
-  [user schemas]
-  [reminder schemas]
-}
-
-package "Core Layer" {
-  [Settings]
-  [JWT Security]
-  [get_current_user]
-  [Unified Response]
-}
-
-package "Service Layer" {
-  [SpeechRecognitionService]
-  [CloudASRProvider]
-  [MockASRProvider]
-  [ASR config store]
-  [ASRPostCorrector]
-  [DialectNormalizer]
-  [MultiCommandParser]
-  [CommandParser]
-  [device_capabilities]
-  [CommandExecutor]
-  [personalization]
-  [home_actions]
-}
-
-package "ORM Model Layer" {
-  [Home]
-  [User]
-  [Room]
-  [Device]
-  [DeviceStatusHistory]
-  [CommandLog]
-  [Reminder]
-  [Scene]
-  [SceneAction]
-  [UserPreference]
-  [DeviceAlias]
-}
-
+rectangle "HTTP Router Layer\nhealth / auth / devices / commands\nvoice / user / reminders / weather / scenes" as Router
+rectangle "Schema Layer\nauth / device / command / voice\nuser / reminder schemas" as Schema
+rectangle "Core Layer\nSettings / JWT Security\nget_current_user / Unified Response" as Core
+rectangle "Service Layer\nASR Service + Provider\nASRPostCorrector + DialectNormalizer\nMultiCommandParser + CommandParser\nCommandExecutor + personalization\nhome_actions + device_capabilities" as Service
+rectangle "ORM Model Layer\nHome / User / Room / Device\nCommandLog / DeviceStatusHistory\nReminder / Scene / SceneAction\nUserPreference / DeviceAlias" as Model
 database "SQLite app.db" as DB
 file "asr_config.json" as ConfigFile
-cloud "Xunfei / generic cloud ASR" as CloudASR
-cloud "Open-Meteo" as Weather
+cloud "Cloud ASR / Open-Meteo" as External
 
-[auth router] --> [auth schemas]
-[auth router] --> [JWT Security]
-[devices router] --> [device schemas]
-[commands router] --> [command schemas]
-[voice router] --> [voice schemas]
-[user router] --> [user schemas]
-[reminders router] --> [reminder schemas]
-
-[auth router] --> [get_current_user]
-[devices router] --> [get_current_user]
-[commands router] --> [get_current_user]
-[voice router] --> [get_current_user]
-[user router] --> [get_current_user]
-[reminders router] --> [get_current_user]
-[scenes router] --> [get_current_user]
-
-[commands router] --> [CommandExecutor]
-[voice router] --> [SpeechRecognitionService]
-[voice router] --> [CommandExecutor]
-[voice router] --> [ASR config store]
-[user router] --> [personalization]
-[weather router] --> [home_actions]
-[scenes router] --> [home_actions]
-
-[SpeechRecognitionService] --> [CloudASRProvider]
-[SpeechRecognitionService] --> [MockASRProvider]
-[CloudASRProvider] --> [ASR config store]
-[ASR config store] --> ConfigFile
-[CloudASRProvider] --> CloudASR
-[CommandExecutor] --> [personalization]
-[CommandExecutor] --> [ASRPostCorrector]
-[CommandExecutor] --> [DialectNormalizer]
-[CommandExecutor] --> [MultiCommandParser]
-[MultiCommandParser] --> [CommandParser]
-[CommandParser] --> [device_capabilities]
-[CommandExecutor] --> [device_capabilities]
-[CommandExecutor] --> [home_actions]
-[home_actions] --> Weather
-
-[Home] --> DB
-[User] --> DB
-[Room] --> DB
-[Device] --> DB
-[DeviceStatusHistory] --> DB
-[CommandLog] --> DB
-[Reminder] --> DB
-[Scene] --> DB
-[SceneAction] --> DB
-[UserPreference] --> DB
-[DeviceAlias] --> DB
-
-[Unified Response] .. [auth router]
-[Unified Response] .. [commands router]
-[Unified Response] .. [voice router]
+Router --> Schema : 请求与响应模型
+Router --> Core : 鉴权、配置、统一响应
+Router --> Service : 业务编排
+Service --> Model
+Model --> DB
+Service --> ConfigFile : ASR 配置
+Service --> External : ASR / 天气
 @enduml

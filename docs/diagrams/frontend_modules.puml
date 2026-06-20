@@ -1,108 +1,27 @@
 @startuml
 title 前端页面、组件与接口封装
+top to bottom direction
 skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultFontSize 18
+skinparam titleFontSize 22
+skinparam ArrowFontSize 14
+skinparam packageFontSize 18
 
-package "App Shell" {
-  [main.js]
-  [App.vue]
-  [Vue Router]
-  [AppLayout.vue]
-  [Pinia authStore]
-}
-
-package "Views" {
-  [LoginView.vue]
-  [DashboardView.vue]
-  [DevicesView.vue]
-  [VoiceControlView.vue]
-  [LogsView.vue]
-  [RemindersView.vue]
-  [ScenesView.vue]
-}
-
-package "Components" {
-  [DeviceCard.vue]
-  [DeviceAliasDialog.vue]
-  [PersonalizationCard.vue]
-  [LogDetailDrawer.vue]
-  [SceneCard.vue]
-  [CommandResult.vue]
-}
-
-package "API Wrappers" {
-  [request.js]
-  [auth.js]
-  [dashboard.js]
-  [device.js]
-  [command.js]
-  [voice.js]
-  [personalization.js]
-  [reminder.js]
-  [scene.js]
-  [weather.js]
-}
-
-package "Utilities" {
-  [normalizers.js]
-  [config/api.js]
-}
-
-cloud "Browser Web Speech API" as WebSpeech
-cloud "Browser SpeechSynthesis" as SpeechSynthesis
+rectangle "App Shell\nmain.js / App.vue\nVue Router / AppLayout\nPinia authStore" as Shell
+rectangle "业务页面 Views\nLogin / Dashboard / Devices\nVoice / Logs / Reminders / Scenes" as Views
+rectangle "复用组件 Components\nDeviceCard / DeviceAliasDialog\nPersonalizationCard / LogDetailDrawer\nSceneCard / CommandResult" as Components
+rectangle "API Wrappers\nrequest.js 统一封装\n鉴权 token / 401 处理\n业务 API 文件分模块调用" as ApiWrap
+rectangle "Utilities\nnormalizers.js\nconfig/api.js" as Utils
+cloud "Browser APIs\nWeb Speech / SpeechSynthesis" as Browser
 rectangle "FastAPI /api" as API
 
-[main.js] --> [App.vue]
-[main.js] --> [Vue Router]
-[main.js] --> [Pinia authStore]
-[Vue Router] --> [AppLayout.vue]
-[Vue Router] --> [LoginView.vue]
-[AppLayout.vue] --> [DashboardView.vue]
-[AppLayout.vue] --> [DevicesView.vue]
-[AppLayout.vue] --> [VoiceControlView.vue]
-[AppLayout.vue] --> [LogsView.vue]
-[AppLayout.vue] --> [RemindersView.vue]
-[AppLayout.vue] --> [ScenesView.vue]
-[Pinia authStore] --> [auth.js]
-
-[LoginView.vue] --> [auth.js]
-[DashboardView.vue] --> [dashboard.js]
-[DashboardView.vue] --> [weather.js]
-[DashboardView.vue] --> [scene.js]
-[DashboardView.vue] --> [command.js]
-[DashboardView.vue] --> [device.js]
-[DevicesView.vue] --> [DeviceCard.vue]
-[DevicesView.vue] --> [DeviceAliasDialog.vue]
-[DevicesView.vue] --> [device.js]
-[DevicesView.vue] --> [personalization.js]
-[VoiceControlView.vue] --> [voice.js]
-[VoiceControlView.vue] --> [command.js]
-[VoiceControlView.vue] --> [personalization.js]
-[VoiceControlView.vue] --> [PersonalizationCard.vue]
-[VoiceControlView.vue] --> WebSpeech
-[VoiceControlView.vue] --> SpeechSynthesis
-[LogsView.vue] --> [LogDetailDrawer.vue]
-[LogsView.vue] --> [command.js]
-[RemindersView.vue] --> [reminder.js]
-[ScenesView.vue] --> [SceneCard.vue]
-[ScenesView.vue] --> [scene.js]
-[ScenesView.vue] --> [device.js]
-
-[auth.js] --> [request.js]
-[dashboard.js] --> [request.js]
-[device.js] --> [request.js]
-[command.js] --> [request.js]
-[voice.js] --> [request.js]
-[personalization.js] --> [request.js]
-[reminder.js] --> [request.js]
-[scene.js] --> [request.js]
-[weather.js] --> [request.js]
-[request.js] --> [config/api.js]
-[request.js] --> API
-
-[DashboardView.vue] --> [normalizers.js]
-[DevicesView.vue] --> [normalizers.js]
-[VoiceControlView.vue] --> [normalizers.js]
-[LogsView.vue] --> [normalizers.js]
-[RemindersView.vue] --> [normalizers.js]
-[ScenesView.vue] --> [normalizers.js]
+Shell --> Views : 路由与布局
+Views --> Components : 页面组合
+Views --> ApiWrap : 业务请求
+Views --> Browser : 语音识别与反馈
+Views --> Utils : 展示适配
+ApiWrap --> Utils : baseURL / 数据适配
+ApiWrap --> API : /api
 @enduml

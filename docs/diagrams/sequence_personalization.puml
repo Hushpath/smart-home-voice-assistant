@@ -1,46 +1,28 @@
 @startuml
-title 个性化偏好与设备别名参与执行顺序图（简化视图）
+title 个性化偏好与设备别名参与执行顺序图（紧凑视图）
+skinparam defaultFontName "Microsoft YaHei"
+skinparam defaultFontSize 20
+skinparam SequenceParticipantFontSize 20
+skinparam SequenceMessageFontSize 19
+skinparam maxMessageSize 200
+skinparam Shadowing false
+hide footbox
+
 actor "家庭用户" as User
-participant "Frontend Views\nPersonalizationCard / DevicesView / VoiceControlView" as FE
-participant "Frontend API\npersonalization.js / command.js" as API
-participant "Backend Router\nuser router / commands router" as Router
-participant "CommandExecutor" as Exec
-participant "personalization service" as PersonalService
-participant "Text Understanding Pipeline" as Pipeline
-database "SQLite\nuser_preferences / device_aliases / command_logs" as DB
+participant "前端语音页" as FE
+participant "后端指令接口" as API
+participant "个性化服务" as Personal
+participant "指令执行链路" as Chain
+database "SQLite" as DB
 
-== 偏好维护 ==
-User -> FE: 保存默认方言或输入方式
-FE -> API: PATCH /api/user/preferences
-API -> Router: preferred_dialect / preferred_input_mode
-Router -> DB: get_or_create then update user_preferences
-DB --> Router: updated preference
-Router --> API: success envelope
-API --> FE: show saved
-
-== 设备别名维护 ==
-User -> FE: 新建设备别名
-FE -> API: POST /api/user/device-aliases
-API -> Router: device_id + alias
-Router -> DB: check current-user alias uniqueness
-Router -> DB: insert device_aliases
-DB --> Router: alias detail
-Router --> API: success envelope
-API --> FE: refresh aliases
-
-== 个性化参与指令执行 ==
-User -> FE: 执行“打开小灯”
+User -> FE: 执行命令
 FE -> API: POST /api/commands/execute
-API -> Router: command text
-Router -> Exec: execute(command, context)
-Exec -> PersonalService: get preferences and match alias
-PersonalService -> DB: read preference and aliases
-DB --> PersonalService: preferred_dialect + alias_match
-PersonalService --> Exec: personalization context
-Exec -> Pipeline: rewrite alias, correct, normalize, parse
-Pipeline --> Exec: ParseResult with alias_match and Parser confidence
-Exec -> DB: write preference_used and alias_match
-Exec --> Router: execution result
-Router --> API: success/code/message/data
-API --> FE: show result
+API -> Personal: 读取偏好、匹配设备别名
+Personal -> DB: 查询偏好和别名
+DB --> Personal: 个性化上下文
+Personal --> Chain: 命令文本 + alias_match
+Chain -> Chain: 纠错 / 归一 / 解析 / 校验
+Chain -> DB: 记录日志
+Chain --> API: 执行结果
+API --> FE: 展示结果
 @enduml

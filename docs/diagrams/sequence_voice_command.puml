@@ -1,57 +1,48 @@
 @startuml
 title 三类输入进入统一指令执行链路（简化视图）
+skinparam shadowing false
+skinparam defaultFontSize 18
+skinparam titleFontSize 22
+skinparam sequenceParticipantFontSize 16
+skinparam sequenceMessageFontSize 14
 actor "家庭用户" as User
-participant "VoiceControlView.vue" as FE
-participant "voice.js / command.js" as API
-participant "voice router / commands router" as Router
-participant "ASR Service + Provider" as ASR
-participant "CommandExecutor" as Exec
-participant "personalization" as Personal
-participant "Text Understanding Pipeline\n纠错 -> 归一 -> 拆分 -> 解析 -> 能力校验" as Pipeline
-participant "Business Services\nhome_actions / reminders / weather / scenes" as Biz
-database "SQLite" as DB
+participant "前端\nVoiceControlView" as FE
+participant "后端 API\nvoice / commands" as API
+participant "ASR Provider\n云端或测试" as ASR
+participant "统一执行链路\nCommandExecutor" as Exec
+participant "业务与数据\nSQLite + services" as Biz
 
 alt 云端 ASR 音频
   User -> FE: 录音
   FE -> API: POST /api/voice/execute
-  API -> Router: multipart audio + dialect?
-  Router -> ASR: recognize(audio, trace_id)
+  API -> ASR: recognize(audio)
   break 云端 ASR 不可用
-    ASR --> Router: ASRProviderError + fallback
-    Router --> API: error + browser_speech/text_input
-    API --> FE: show fallback suggestion
+    ASR --> API: 错误 + fallback 建议
+    API --> FE: 提示浏览器识别或文本输入
   end
-  ASR --> Router: transcript + raw_result
+  ASR --> API: transcript
 else 浏览器识别文本
   User -> FE: Web Speech API 得到文本
   FE -> API: POST /api/commands/execute
-  API -> Router: command text
 else 手工文本输入
   User -> FE: 输入文本
   FE -> API: POST /api/commands/execute
-  API -> Router: command text
 end
 
-Router -> Exec: execute(command/transcript, context)
-Exec -> Personal: read preferences and aliases
-Personal -> DB: user_preferences / device_aliases / command_logs
-Personal --> Exec: preference_used / alias_match
-
-Exec -> Pipeline: asr_post_correction + normalization + parse
-Pipeline -> DB: rooms / devices / aliases / scenes lexicon
-Pipeline --> Exec: ParseResult(s) + Parser confidence
+API -> Exec: command / transcript + context
+Exec -> Biz: 读取偏好、别名、设备、场景词表
+Biz --> Exec: execution context
+Exec -> Exec: 纠错 -> 方言归一\n-> 多指令拆分 -> 解析\n-> Parser 置信度与能力校验
 
 alt 解析有效
-  Exec -> Biz: execute device/reminder/weather/scene action
-  Biz -> DB: update virtual devices / reminders / scenes
-  Biz -> DB: write device_status_history when state changes
-  Exec -> DB: write one command_logs record
-  Exec --> Router: execution result
+  Exec -> Biz: 执行设备 / 提醒 / 天气 / 场景动作
+  Biz --> Exec: 业务结果
+  Exec -> Biz: 写 command_logs\n必要时写 device_status_history
+  Exec --> API: 执行成功或部分成功
 else 低置信度或非法指令
-  Exec -> DB: write failed command_logs record
-  Exec --> Router: BusinessError
+  Exec -> Biz: 写失败日志
+  Exec --> API: 业务错误
 end
 
-Router --> API: success/code/message/data
 API --> FE: show summary and log detail entry
 @enduml
