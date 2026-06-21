@@ -8,20 +8,24 @@ skinparam defaultFontSize 18
 skinparam titleFontSize 22
 skinparam ArrowFontSize 14
 skinparam packageFontSize 18
+skinparam roundcorner 8
 
-rectangle "App Shell\nmain.js / App.vue\nVue Router / AppLayout\nPinia authStore" as Shell
-rectangle "业务页面 Views\nLogin / Dashboard / Devices\nVoice / Logs / Reminders / Scenes" as Views
-rectangle "复用组件 Components\nDeviceCard / DeviceAliasDialog\nPersonalizationCard / LogDetailDrawer\nSceneCard / CommandResult" as Components
-rectangle "API Wrappers\nrequest.js 统一封装\n鉴权 token / 401 处理\n业务 API 文件分模块调用" as ApiWrap
-rectangle "Utilities\nnormalizers.js\nconfig/api.js" as Utils
-cloud "Browser APIs\nWeb Speech / SpeechSynthesis" as Browser
-rectangle "FastAPI /api" as API
+rectangle "应用外壳 App Shell\nmain.js / App.vue\nVue Router / AppLayout\nPinia authStore" as Shell #EEF5FF
+rectangle "业务页面 Views\nLogin / Dashboard / Devices\nVoice / Logs / Reminders / Scenes" as Views #F6F8FA
+rectangle "语音交互能力\nCloud ASR 配置 / Web Speech\n文本输入兜底 / SpeechSynthesis" as VoiceUX #FFF7E6
+rectangle "复用组件 Components\nDeviceCard / DeviceAliasDialog\nPersonalizationCard / LogDetailDrawer\nSceneCard / CommandResult" as Components #F6F8FA
+rectangle "接口封装 API Wrappers\nrequest.js 统一封装\n鉴权 token / 401 处理\n业务 API 文件分模块调用" as ApiWrap #F0FFF4
+rectangle "展示适配 Utilities\nnormalizers.js\nconfig/api.js" as Utils #F0FFF4
+cloud "浏览器能力 Browser APIs\nWeb Speech / SpeechSynthesis" as Browser #FFFFFF
+rectangle "后端接口 FastAPI /api" as API #FFFFFF
 
 Shell --> Views : 路由与布局
 Views --> Components : 页面组合
+Views --> VoiceUX : 语音页交互
 Views --> ApiWrap : 业务请求
-Views --> Browser : 语音识别与反馈
 Views --> Utils : 展示适配
+VoiceUX --> Browser : 语音识别与反馈
+VoiceUX --> ApiWrap : 识别配置与执行
 ApiWrap --> Utils : baseURL / 数据适配
 ApiWrap --> API : /api
 @enduml

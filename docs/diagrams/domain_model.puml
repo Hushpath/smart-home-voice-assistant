@@ -1,5 +1,6 @@
 @startuml
 title 需求层领域对象关系图
+left to right direction
 skinparam classAttributeIconSize 0
 
 class "用户" as User
@@ -20,30 +21,30 @@ class "用户偏好" as UserPreference
 class "设备别名" as DeviceAlias
 class "常用指令" as FrequentCommand
 
-User "1" -- "1" UserPreference : 拥有
-User "1" -- "多个" DeviceAlias : 维护
-User "1" -- "多个" FrequentCommand : 形成
-User "1" -- "多个" VoiceInput : 发起
-User "1" -- "多个" Command : 发起
-User "1" -- "多个" Reminder : 维护
+User -- UserPreference : 拥有
+User -- DeviceAlias : 维护
+User -- FrequentCommand : 形成
+User -- VoiceInput : 发起
+User -- Command : 发起
+User -- Reminder : 维护
 
-Home "1" -- "多个" Room : 包含
-Room "1" -- "多个" Device : 包含
-Device "1" -- "多个" DeviceHistory : 产生
-DeviceAlias "多个" -- "1" Device : 指向
+Home -- Room : 包含
+Room -- Device : 包含
+Device -- DeviceHistory : 产生
+DeviceAlias -- Device : 指向
 
-VoiceInput "1" -- "1" InputPath : 选择
-VoiceInput "1" -- "0..1" RecognitionResult : 产生
-RecognitionResult "0..1" --> Command : 转为
+VoiceInput -- InputPath : 选择
+VoiceInput -- RecognitionResult : 产生
+RecognitionResult --> Command : 转为
 
-Command "1" -- "0..1" CommandLog : 产生
+Command -- CommandLog : 产生
 Command --> Device : 可触发设备控制
 Command --> Reminder : 可创建或管理
 Command --> WeatherQuery : 可触发
 Command --> Scene : 可触发执行
 
-Scene "1" -- "多个" SceneAction : 包含
-SceneAction "多个" -- "1" Device : 作用于
+Scene -- SceneAction : 包含
+SceneAction -- Device : 作用于
 SceneAction --> DeviceHistory : 可产生
 
 @enduml

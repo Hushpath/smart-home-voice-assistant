@@ -8,21 +8,31 @@ skinparam defaultFontSize 18
 skinparam titleFontSize 22
 skinparam ArrowFontSize 14
 skinparam packageFontSize 18
+skinparam roundcorner 8
 
-rectangle "HTTP Router Layer\nhealth / auth / devices / commands\nvoice / user / reminders / weather / scenes" as Router
-rectangle "Schema Layer\nauth / device / command / voice\nuser / reminder schemas" as Schema
-rectangle "Core Layer\nSettings / JWT Security\nget_current_user / Unified Response" as Core
-rectangle "Service Layer\nASR Service + Provider\nASRPostCorrector + DialectNormalizer\nMultiCommandParser + CommandParser\nCommandExecutor + personalization\nhome_actions + device_capabilities" as Service
-rectangle "ORM Model Layer\nHome / User / Room / Device\nCommandLog / DeviceStatusHistory\nReminder / Scene / SceneAction\nUserPreference / DeviceAlias" as Model
-database "SQLite app.db" as DB
-file "asr_config.json" as ConfigFile
-cloud "Cloud ASR / Open-Meteo" as External
+rectangle "HTTP 路由层 Router\nhealth / auth / devices / commands\nvoice / user / reminders / weather / scenes" as Router #EEF5FF
+rectangle "请求模型层 Schema\nauth / device / command / voice\nuser / reminder schemas" as Schema #F6F8FA
+rectangle "核心支撑层 Core\nSettings / JWT 安全\n当前用户依赖 / 统一响应" as Core #F6F8FA
 
-Router --> Schema : 请求与响应模型
-Router --> Core : 鉴权、配置、统一响应
-Router --> Service : 业务编排
-Service --> Model
-Model --> DB
-Service --> ConfigFile : ASR 配置
-Service --> External : ASR / 天气
+rectangle "语音接入服务\nSpeechRecognitionService / ASR Provider\nASRPostCorrector / DialectNormalizer" as VoiceService #FFF7E6
+rectangle "指令解析与执行服务\nMultiCommandParser / CommandParser\nCommandExecutor / device_capabilities" as CommandService #FFF7E6
+rectangle "家庭业务服务\nhome_actions / personalization\nreminders / scenes / weather" as HomeService #FFF7E6
+
+rectangle "ORM 数据模型层\nHome / User / Room / Device\nCommandLog / DeviceStatusHistory\nReminder / Scene / SceneAction\nUserPreference / DeviceAlias" as Model #F0FFF4
+database "SQLite app.db" as DB #FFFFFF
+file "ASR 本地配置\nasr_config.json" as ConfigFile #FFFFFF
+cloud "外部服务\nCloud ASR / Open-Meteo" as External #FFFFFF
+
+Router -left-> Schema : 请求与响应模型
+Router -down-> Core : 鉴权、配置、统一响应
+Router -down-> VoiceService : 语音入口
+Router -right-> CommandService : 指令入口
+CommandService -down-> HomeService : 设备、提醒、天气、场景动作
+VoiceService -right-> CommandService : transcript / corrected text
+VoiceService -down-> ConfigFile : ASR 配置
+VoiceService -down-> External : 云端识别
+HomeService -down-> Model : 业务数据读写
+CommandService -down-> Model : 日志与上下文
+HomeService -left-> External
+Model -down-> DB
 @enduml

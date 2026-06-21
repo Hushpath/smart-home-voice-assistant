@@ -1,6 +1,6 @@
 @startuml
 title 智能家居语音交互助手总体架构
-top to bottom direction
+left to right direction
 skinparam componentStyle rectangle
 skinparam packageStyle rectangle
 skinparam shadowing false
@@ -8,24 +8,32 @@ skinparam defaultFontSize 18
 skinparam titleFontSize 22
 skinparam ArrowFontSize 14
 skinparam packageFontSize 18
+skinparam roundcorner 10
+skinparam rectangle {
+  BorderColor #7A869A
+  FontColor #172B4D
+}
 
 actor "家庭用户" as User
 
-rectangle "前端 Vue 3 + Vite\n页面、组件、路由守卫\nPinia、Axios API 封装\n浏览器语音识别 / 文本输入" as FE
-rectangle "后端 FastAPI /api\nrouter、schema、core\n统一响应与 JWT 鉴权" as API
-rectangle "业务服务层\nASR Service / Provider\n文本理解 Pipeline\nCommandExecutor\npersonalization / home_actions" as Service
-database "SQLite app.db\n用户、家庭、房间、虚拟设备\n日志、历史、提醒、场景、偏好" as DB
-file "asr_config.json\n本地 ASR 配置" as ASRConfig
-cloud "外部服务\n云端 ASR / Open-Meteo" as External
+rectangle "前端交互层 Vue 3 + Vite\n页面 / 组件 / 路由守卫\nPinia + Axios API 封装" as FE #EEF5FF
 
-User --> FE
-FE --> API : /api JSON / multipart
-API --> Service
-Service --> DB : 读写业务数据
-Service --> ASRConfig : 读取配置
-Service --> External : ASR / 天气
+rectangle "后端接口层 FastAPI /api\nrouter / schema / core\n统一响应 envelope\nJWT 鉴权与当前用户依赖" as API #EAF2FF
 
-note bottom of DB
+rectangle "核心服务层\nASR Provider / 后纠错 / 方言归一\nMultiCommandParser / CommandParser\nCommandExecutor / home_actions\npersonalization / device_capabilities" as Service #FFF7E6
+
+rectangle "数据与外部资源\nSQLite app.db：用户、家庭、房间、虚拟设备、日志、历史\nasr_config.json：本地 ASR 配置\nCloud ASR / Open-Meteo：识别与天气查询" as Resources #F0FFF4
+
+User --> FE : 页面操作
+FE --> API : /api JSON / multipart\n云端录音 / Web Speech / 文本输入
+API --> Service : transcript / command / context
+Service --> Resources : 读写业务数据\n读取配置 / 调用外部服务
+
+FE -[hidden]down-> Service
+API -[hidden]down-> Resources
+Service -[hidden]right-> Resources
+
+note bottom of Resources
   当前设备状态是虚拟设备状态，
   不代表真实硬件状态。
 end note
