@@ -1,7 +1,12 @@
+import os
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
@@ -52,3 +57,30 @@ app.include_router(weather.router, prefix=settings.api_prefix)
 app.include_router(scenes.router, prefix=settings.api_prefix)
 app.include_router(voice.router, prefix=settings.api_prefix)
 app.include_router(user.router, prefix=settings.api_prefix)
+
+
+def _mount_static_frontend() -> None:
+    static_dir = os.getenv("SMART_HOME_STATIC_DIR")
+    if not static_dir:
+        return
+
+    frontend_dir = Path(static_dir).resolve()
+    index_file = frontend_dir / "index.html"
+    assets_dir = frontend_dir / "assets"
+    if not index_file.is_file():
+        return
+
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_frontend(full_path: str):
+        if full_path == "api" or full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not Found")
+        requested_file = (frontend_dir / full_path).resolve()
+        if requested_file.is_file() and frontend_dir in requested_file.parents:
+            return FileResponse(requested_file)
+        return FileResponse(index_file)
+
+
+_mount_static_frontend()

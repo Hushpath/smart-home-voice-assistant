@@ -109,56 +109,60 @@ software/
 └── README.md
 ```
 
+
+
 ## 快速开始
 
-### 1. 初始化并启动后端
+### 演示包快速启动
+使用演示包可以快速启动，无需配置环境
 
-推荐方式是创建本地虚拟环境：
-
-```bash
-cd backend
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-python -m app.db.init_db
-python run.py
+演示包位置：
+```text
+release/smart-home-demo.zip
 ```
 
-后端默认地址：
+使用方式：
 
 ```text
-http://127.0.0.1:8000
+1. 解压 smart-home-demo.zip 到任意目录。
+2. 双击 start-demo.bat。
+3. 浏览器访问 http://127.0.0.1:8000。
+4. 使用默认账号 testuser / test123456 登录。
 ```
 
-接口文档：
+### 正常配置启动
+Windows PowerShell 中在项目根目录运行一键启动脚本：
+
+```powershell
+.\start.ps1
+```
+
+脚本会自动完成：
+
+- 创建后端虚拟环境 `backend\.venv`。
+- 按需安装后端和前端依赖。
+- 初始化 SQLite 数据库。
+- 分别启动后端和前端。
+- 检查 `http://127.0.0.1:8000/api/health`。
+- 打开前端页面。
+
+如果 PowerShell 拦截脚本执行，可使用：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\start.ps1
+```
+
+默认地址：
 
 ```text
-http://127.0.0.1:8000/docs
+前端：http://127.0.0.1:5173
+后端：http://127.0.0.1:8000
 ```
-
-健康检查：
-
-```text
-http://127.0.0.1:8000/api/health
-```
-
-### 2. 启动前端
-
-新开一个终端：
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-前端默认地址：
-
-```text
-http://127.0.0.1:5173
-```
-
 前端默认使用 Vite 代理，请求 `/api` 会转发到 `http://127.0.0.1:8000`。
+
+
+
+
 
 ## 默认账号
 
@@ -167,7 +171,7 @@ http://127.0.0.1:5173
 密码：test123456
 ```
 
-## 云端 ASR 配置
+## 云端 ASR 配置(可选)
 
 云端 ASR 只由后端调用，前端不会直接连接云端厂商，也不会保存 API Key。
 
@@ -209,21 +213,30 @@ ASR_ENABLE_CLOUD=true
 
 ## 常用命令
 
-后端：
+启动项目：
+
+```powershell
+.\start.ps1
+```
+
+生成演示压缩包：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\package-demo.ps1
+```
+
+后端测试：
 
 ```bash
 cd backend
-python -m app.db.init_db
-python run.py
 python -m pytest
 python scripts/smoke_test.py
 ```
 
-前端：
+前端构建检查：
 
 ```bash
 cd frontend
-npm run dev
 npm run build
 ```
 
@@ -278,10 +291,10 @@ npm run build
 
 ```json
 {
-  "success": true,
-  "code": "OK",
-  "message": "操作成功",
-  "data": {}
+	"success": true,
+	"code": "OK",
+	"message": "操作成功",
+	"data": {}
 }
 ```
 
@@ -451,7 +464,7 @@ backend/data/app.db
 天气接口：
 
 ```text
-GET /api/weather?city=北京
+GET /api/weather?city=广州
 ```
 
 天气数据优先使用 Open-Meteo。外部请求失败、超时或城市无法识别时，后端会返回本地备用数据，并在返回字段中标记 `source: "mock"`。
@@ -479,53 +492,6 @@ cd frontend
 npm run build
 ```
 
-推荐演示流程：
-
-1. 初始化数据库并启动后端。
-2. 启动前端并使用默认账号登录。
-3. 进入语音控制页，确认 `/api/voice/providers` 状态。
-4. 在个性化设置中保存：默认方言粤语。
-5. 进入设备页。
-6. 给“客厅灯”设置别名“小灯”。
-7. 回到语音控制页。
-8. 执行“打开小灯”，确认客厅灯被打开。
-9. 执行“查询北京天气”，确认天气查询可用。
-10. 执行“将电视机声量调到三十”，确认粤语词“声量”被识别为音量。
-11. 打开操作日志页。
-12. 查看日志详情，确认能看到 `preference_used` 和 `alias_match`。
-13. 回到设备页，查看设备历史。
-
-推荐截图：
-
-- 登录页
-- Dashboard
-- 语音控制页
-- 个性化设置
-- 语音能力状态
-- 设备别名管理
-- 粤语指令执行结果
-- 日志列表
-- 日志详情
-- 设备页
-- 设备历史
-- pytest 通过
-- npm run build 通过
-- smoke test 通过
-
-## 已知限制
-
-- 系统不训练自己的语音识别模型。
-- 云端 ASR 需要 API Key 和网络；当前已适配讯飞语音听写，其他厂商仍需按官方文档扩展。
-- 未配置云端 ASR 时，应使用浏览器识别或文本输入兜底。
-- ASR 后纠错只在项目领域词表内保守修正，不做通用中文纠错。
-- 方言支持是有限场景下的指令容错，不是完整方言自然对话。
-- 多指令拆分是规则式能力，适合常见连接词、对象前置和共享上下文，并包含基础歧义保护；不覆盖任意复杂自然语言并列结构。
-- 粤语是重点增强，但不是完整粤语对话系统。
-- 系统使用 SQLite 中的虚拟设备，不接入真实智能家居硬件。
-- 低置信度二次确认机制暂未实现。
-- `MockASRProvider` 只用于测试和本地开发。
-- 提醒模块只支持数据管理，不包含后台通知或定时推送。
-- 天气查询依赖外网时可能失败，但会自动回退本地备用数据，保证演示稳定。
 
 ## 相关文档
 

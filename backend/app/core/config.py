@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 
 BASE_DIR = Path(__file__).resolve().parents[2]
-DATA_DIR = BASE_DIR / "data"
+DATA_DIR = Path(os.getenv("SMART_HOME_DATA_DIR", BASE_DIR / "data")).resolve()
 DATABASE_PATH = DATA_DIR / "app.db"
 
 

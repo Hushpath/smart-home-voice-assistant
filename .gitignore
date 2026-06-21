@@ -7,10 +7,13 @@ __pycache__/
 .venv/
 venv/
 env/
+node_modules/
 
 backend/data/*.db
 backend/data/*.db-*
 backend/data/asr_config.json
+backend/logs/
+release/
 
 .env
 .env.*
